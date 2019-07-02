@@ -42,7 +42,7 @@ public:
 	int bytesSent;
 	int bytesRec;
 
-	bool connect2Server();
+	bool connect2server();
 	bool sendData(const char*, int);
 	bool receiveData(char*, int);
 	bool disconnect();

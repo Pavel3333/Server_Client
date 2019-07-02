@@ -45,7 +45,7 @@ Client::~Client() {
 	if(state > INIT_WINSOCK)  WSACleanup();
 }
 
-bool Client::connect2Server() {
+bool Client::connect2server() {
 	// Initialize Winsock
 	state = CLIENT_STATE::INIT_WINSOCK;
 
@@ -119,7 +119,7 @@ int main() {
 
 	Client* client = new Client();
 
-	if (client->connect2Server())                                     goto client_failed;
+	if (client->connect2server())                                     goto client_failed;
 	if (client->sendData(data_to_send.data(), data_to_send.length())) goto client_failed;
 	if (client->receiveData(received_data, NET_BUFFER_SIZE))          goto client_failed;
 	if (client->disconnect())                                         goto client_failed;
