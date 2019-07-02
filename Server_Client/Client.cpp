@@ -3,9 +3,13 @@
 #include "Client.h"
 
 Client::Client(const char* IP, uint16_t port) {
+	// Инициализация
 	state = CLIENT_STATE::SUCCESS;
 
-	ConnectSocket = INVALID_SOCKET;
+	connectSocket = INVALID_SOCKET;
+
+	this->IP   = IP;
+	this->port = port;
 }
 
 Client::~Client() {
@@ -43,7 +47,7 @@ Client::~Client() {
 
 	if (error_msg) printf(error_msg, error_code);
 
-	if (state > CREATE_SOCKET) closesocket(ConnectSocket);
+	if (state > CREATE_SOCKET) closesocket(connectSocket);
 	if (state > INIT_WINSOCK)  WSACleanup();
 }
 
@@ -56,20 +60,22 @@ bool Client::connect2server() {
 	// Create a SOCKET for connecting to server (TCP/IP protocol)
 	state = CLIENT_STATE::CREATE_SOCKET;
 
-	ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (ConnectSocket == INVALID_SOCKET) return true;
+	connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (connectSocket == INVALID_SOCKET) return true;
 
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port of the server to be connected to.
 
-	clientService.sin_family = AF_INET;
-	clientService.sin_port = htons(port);
-	inet_pton(AF_INET, IP, &clientService.sin_addr.s_addr);
+	socketDesc.sin_family = AF_INET;
+	socketDesc.sin_port = htons(port);
+	inet_pton(AF_INET, IP, &socketDesc.sin_addr.s_addr);
 
 	// Connect to server.
 	state = CLIENT_STATE::CONNECT;
 
-	if (connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService)) == SOCKET_ERROR) return true;
+	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return true;
+
+	printf("The client was connected to the server %s (%u)\n", inet_ntoa(socketDesc.sin_addr), ntohs(socketDesc.sin_port));
 
 	return state = CLIENT_STATE::SUCCESS;
 }
@@ -78,10 +84,10 @@ bool Client::sendData(const char* data, int size) {
 	// Send an initial buffer
 	state = CLIENT_STATE::SEND;
 
-	bytesSent = send(ConnectSocket, data, size, 0);
+	bytesSent = send(connectSocket, data, size, 0);
 	if (bytesSent == SOCKET_ERROR) return true;
 
-	printf("Bytes Sent: %d\n", bytesSent);
+	printf("Bytes sent: %d\n", bytesSent);
 
 	return state = CLIENT_STATE::SUCCESS;
 }
@@ -90,14 +96,14 @@ bool Client::receiveData(char* data, int size) {
 	// shutdown the connection since no more data will be sent
 	state = CLIENT_STATE::SHUTDOWN;
 
-	if (shutdown(ConnectSocket, SD_SEND) == SOCKET_ERROR) return true;
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return true;
 
 	// Receive until the peer closes the connection
 	state = CLIENT_STATE::RECEIVE;
 
 	do {
-		bytesRec = recv(ConnectSocket, data, size, 0);
-		if (bytesRec > 0)       printf("Bytes received: %d\n", bytesRec);
+		bytesRec = recv(connectSocket, data, size, 0);
+		if      (bytesRec >  0) printf("Bytes received: %d\n", bytesRec);
 		else if (bytesRec == 0) printf("Connection closed\n");
 		else return true;
 	} while (bytesRec > 0);
@@ -106,10 +112,13 @@ bool Client::receiveData(char* data, int size) {
 }
 
 bool Client::disconnect() {
-	// close the socket
+	// Close the socket
 	state = CLIENT_STATE::CLOSE_SOCKET;
 
-	if (closesocket(ConnectSocket) == SOCKET_ERROR) return true;
+	if (closesocket(connectSocket) == SOCKET_ERROR) return true;
+	WSACleanup();
+
+	printf("The client was stopped\n");
 
 	return state = CLIENT_STATE::SUCCESS;
 }

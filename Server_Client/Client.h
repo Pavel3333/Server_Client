@@ -9,7 +9,7 @@ enum[[nodiscard]] ERROR_TYPE : uint8_t{
 	CRITICAL_ERROR // Критическая ошибка
 };
 
-enum[[nodiscard]] CLIENT_STATE : uint8_t{
+enum[[nodiscard]] CLIENT_STATE : uint8_t {
 	SUCCESS = 0,
 	INIT_WINSOCK,
 	CREATE_SOCKET,
@@ -43,7 +43,7 @@ public:
 private:
 	WSADATA wsaData;
 
-	SOCKET ConnectSocket;
+	SOCKET connectSocket;
 
-	struct sockaddr_in clientService;
+	struct sockaddr_in socketDesc;
 };
