@@ -1,9 +1,5 @@
 #pragma once
 
-#ifndef UNICODE
-#define UNICODE
-#endif
-
 #define WIN32_LEAN_AND_MEAN
 
 #include <winsock2.h>
@@ -12,9 +8,9 @@
 
 #include <iostream>
 
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT   27015
-#define SERVER_IP      "127.0.0.1"
+#define NET_BUFFER_SIZE 512
+#define DEFAULT_PORT    27015
+#define SERVER_IP       "127.0.0.1"
 
 enum [[nodiscard]] ERROR_TYPE : uint8_t {
 	OK = 0,        // Без ошибок

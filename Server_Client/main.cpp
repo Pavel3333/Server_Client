@@ -1,8 +1,5 @@
 #include "main.h"
 
-// Link with ws2_32.lib
-#pragma comment(lib, "Ws2_32.lib")
-
 Client::Client() {
 	state = CLIENT_STATE::SUCCESS;
 
@@ -116,12 +113,20 @@ bool Client::disconnect() {
 }
 
 int main() {
+	std::string_view data_to_send = "Send me please";
+
+	char received_data[NET_BUFFER_SIZE];
+
 	Client* client = new Client();
 
-	if (client->connect2Server()) {
-		delete client;
-		client = nullptr;
-	}
+	if (client->connect2Server())                                     goto client_failed;
+	if (client->sendData(data_to_send.data(), data_to_send.length())) goto client_failed;
+	if (client->receiveData(received_data, NET_BUFFER_SIZE))          goto client_failed;
+	if (client->disconnect())                                         goto client_failed;
 
 	return 0;
+
+client_failed:
+	delete client;
+	client = nullptr;
 }
