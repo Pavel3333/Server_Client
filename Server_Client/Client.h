@@ -2,10 +2,6 @@
 
 #include "stdafx.h"
 
-#define NET_BUFFER_SIZE 512
-#define DEFAULT_PORT    27015
-#define SERVER_IP       "127.0.0.1"
-
 enum[[nodiscard]] ERROR_TYPE : uint8_t{
 	OK = 0,        // Без ошибок
 	WARNING,       // Предупреждение
@@ -26,12 +22,16 @@ enum[[nodiscard]] CLIENT_STATE : uint8_t{
 
 class Client {
 public:
-	Client();
+	Client(const char*, uint16_t);
 	~Client();
 
 	int error_code;
 
 	CLIENT_STATE state;
+
+	const char* IP;
+
+	uint16_t port;
 
 	int bytesSent;
 	int bytesRec;

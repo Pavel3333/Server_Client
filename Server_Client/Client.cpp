@@ -2,7 +2,7 @@
 
 #include "Client.h"
 
-Client::Client() {
+Client::Client(const char* IP, uint16_t port) {
 	state = CLIENT_STATE::SUCCESS;
 
 	ConnectSocket = INVALID_SOCKET;
@@ -63,8 +63,8 @@ bool Client::connect2server() {
 	// IP address, and port of the server to be connected to.
 
 	clientService.sin_family = AF_INET;
-	clientService.sin_port = htons(DEFAULT_PORT);
-	inet_pton(AF_INET, SERVER_IP, &clientService.sin_addr.s_addr);
+	clientService.sin_port = htons(port);
+	inet_pton(AF_INET, IP, &clientService.sin_addr.s_addr);
 
 	// Connect to server.
 	state = CLIENT_STATE::CONNECT;
