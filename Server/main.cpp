@@ -5,16 +5,19 @@
 #define NET_BUFFER_SIZE 512
 #define DEFAULT_PORT    27015
 
+bool start() {
+	auto server = std::make_unique<Server>(DEFAULT_PORT);
+
+	if (server->startServer())    return true;
+	if (server->handleRequests()) return true;
+	if (server->closeServer())    return true;
+
+	return false;
+}
+
 int main() {
-	Server* server = new Server(DEFAULT_PORT);
-
-	if (server->startServer())                                        goto failed;
-	if (server->handleRequests())                                     goto failed;
-	if (server->closeServer())                                        goto failed;
-
-failed:
-	delete server;
-	server = nullptr;
+	if (!start()) printf("Server created successfully!\n");
+	else          printf("Server creating failed\n");
 
 	return 0;
 }
