@@ -4,7 +4,7 @@
 
 Client::Client(const char* IP, uint16_t port) {
 	// Инициализация
-	state = CLIENT_STATE::SUCCESS;
+	state = CLIENT_STATE::OK;
 
 	connectSocket = INVALID_SOCKET;
 
@@ -13,7 +13,7 @@ Client::Client(const char* IP, uint16_t port) {
 }
 
 Client::~Client() {
-	if (state > INIT_WINSOCK) error_code = WSAGetLastError();
+	if (state > CLIENT_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
 	// Вывод сообщения об ошибке
 
@@ -21,25 +21,25 @@ Client::~Client() {
 
 	switch (state)
 	{
-	case INIT_WINSOCK:
+	case CLIENT_STATE::INIT_WINSOCK:
 		error_msg = "INIT_WINSOCK - error: %d\n";
 		break;
-	case CREATE_SOCKET:
+	case CLIENT_STATE::CREATE_SOCKET:
 		error_msg = "CREATE_SOCKET - error: %ld\n";
 		break;
-	case CONNECT:
+	case CLIENT_STATE::CONNECT:
 		error_msg = "CONNECT - error: %d\n";
 		break;
-	case SEND:
+	case CLIENT_STATE::SEND:
 		error_msg = "SEND - error: %d\n";
 		break;
-	case SHUTDOWN:
+	case CLIENT_STATE::SHUTDOWN:
 		error_msg = "SHUTDOWN - error: %d\n";
 		break;
-	case RECEIVE:
+	case CLIENT_STATE::RECEIVE:
 		error_msg = "RECEIVE - error: %d\n";
 		break;
-	case CLOSE_SOCKET:
+	case CLIENT_STATE::CLOSE_SOCKET:
 		error_msg = "CLOSE_SOCKET - error: %d\n";
 		break;
 	default: break;
@@ -47,8 +47,8 @@ Client::~Client() {
 
 	if (error_msg) printf(error_msg, error_code);
 
-	if (state > CREATE_SOCKET) closesocket(connectSocket);
-	if (state > INIT_WINSOCK)  WSACleanup();
+	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(connectSocket);
+	if (state > CLIENT_STATE::INIT_WINSOCK)  WSACleanup();
 }
 
 bool Client::connect2server() {
@@ -75,9 +75,13 @@ bool Client::connect2server() {
 
 	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return true;
 
-	printf("The client was connected to the server %s (%u)\n", inet_ntoa(socketDesc.sin_addr), ntohs(socketDesc.sin_port));
+	char addr_str[16];
 
-	return state = CLIENT_STATE::SUCCESS;
+	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) printf("Cannot to get addr string of server IP\n");
+	else                                                           printf("The client was connected to the server %s (%u)\n", addr_str, ntohs(socketDesc.sin_port));
+
+	state = CLIENT_STATE::OK;
+	return false;
 }
 
 bool Client::sendData(const char* data, int size) {
@@ -89,7 +93,8 @@ bool Client::sendData(const char* data, int size) {
 
 	printf("Bytes sent: %d\n", bytesSent);
 
-	return state = CLIENT_STATE::SUCCESS;
+	state = CLIENT_STATE::OK;
+	return false;
 }
 
 bool Client::receiveData(char* data, int size) {
@@ -106,9 +111,11 @@ bool Client::receiveData(char* data, int size) {
 		if      (bytesRec >  0) printf("Bytes received: %d\n", bytesRec);
 		else if (bytesRec == 0) printf("Connection closed\n");
 		else return true;
-	} while (bytesRec > 0);
+	}
+	while (bytesRec > 0);
 
-	return state = CLIENT_STATE::SUCCESS;
+	state = CLIENT_STATE::OK;
+	return false;
 }
 
 bool Client::disconnect() {
@@ -120,5 +127,6 @@ bool Client::disconnect() {
 
 	printf("The client was stopped\n");
 
-	return state = CLIENT_STATE::SUCCESS;
+	state = CLIENT_STATE::OK;
+	return false;
 }

@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{732FD8D0-7A01-4553-8F61-F35AFF175765}</ProjectGuid>
-    <RootNamespace>ServerClient</RootNamespace>
+    <RootNamespace>Client</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -122,11 +122,9 @@
   <ItemGroup>
     <ClCompile Include="Client.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Client.h" />
-    <ClInclude Include="Server.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -2,9 +2,10 @@
 
 #include "stdafx.h"
 
-enum[[nodiscard]] SERVER_STATE : uint8_t{
-	SUCCESS = 0,
+enum class [[nodiscard]] SERVER_STATE : uint8_t{
+	OK = 0,
 	INIT_WINSOCK,
+	GET_ADDR,
 	CREATE_SOCKET,
 	BIND,
 	LISTEN,
@@ -31,9 +32,12 @@ public:
 	bool closeServer();
 	bool handleRequests();
 private:
+	char port_str[7];
+
 	SOCKET connectSocket;
 
 	WSAData wsaData;
 
-	struct sockaddr_in socketDesc;
+	struct addrinfo  socketDescTemp;
+	struct addrinfo* socketDesc;
 };

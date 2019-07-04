@@ -2,15 +2,15 @@
 
 #include "stdafx.h"
 
-enum[[nodiscard]] ERROR_TYPE : uint8_t{
+enum class [[nodiscard]] ERROR_TYPE : uint8_t{
 	OK = 0,        // Без ошибок
 	WARNING,       // Предупреждение
 	SOFT_ERROR,    // Ошибка
 	CRITICAL_ERROR // Критическая ошибка
 };
 
-enum[[nodiscard]] CLIENT_STATE : uint8_t {
-	SUCCESS = 0,
+enum class [[nodiscard]] CLIENT_STATE : uint8_t {
+	OK = 0,
 	INIT_WINSOCK,
 	CREATE_SOCKET,
 	CONNECT,
