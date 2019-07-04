@@ -12,9 +12,8 @@ int main() {
 
 	char received_data[NET_BUFFER_SIZE];
 
-
-	Server* server = new Server(DEFAULT_PORT);
-	Client* client = new Client(SERVER_IP, DEFAULT_PORT);
+	auto server = make_unique<Server>(DEFAULT_PORT);
+	auto client = make_unique<Client>(SERVER_IP, DEFAULT_PORT);
 
 	if (server->startServer())                                        goto failed;
 	if (server->handleRequests())                                     goto failed;
@@ -27,11 +26,5 @@ int main() {
 	if (server->closeServer())                                        goto failed;
 
 failed:
-	delete client;
-	client = nullptr;
-
-	delete server;
-	server = nullptr;
-
 	return 0;
 }
