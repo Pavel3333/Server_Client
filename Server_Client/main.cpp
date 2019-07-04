@@ -1,5 +1,6 @@
 #include "stdafx.h"
-
+#include <memory>
+#include <array>
 #include "Server.h"
 #include "Client.h"
 
@@ -7,24 +8,52 @@
 #define DEFAULT_PORT    27015
 #define SERVER_IP       "127.0.0.1"
 
-int main() {
+int main()
+{
 	std::string_view data_to_send = "Send me please";
 
-	char received_data[NET_BUFFER_SIZE];
+	std::array<char, NET_BUFFER_SIZE> received_data;
 
-	auto server = make_unique<Server>(DEFAULT_PORT);
-	auto client = make_unique<Client>(SERVER_IP, DEFAULT_PORT);
+	auto server = std::make_unique<Server>(DEFAULT_PORT);
+	auto client = std::make_unique<Client>(SERVER_IP, DEFAULT_PORT);
 
-	if (server->startServer())                                        goto failed;
-	if (server->handleRequests())                                     goto failed;
+	if (server->startServer()) {
+		// fail log here
+		goto failed;
+	}
 
-	if (client->connect2server())                                     goto failed;
-	if (client->sendData(data_to_send.data(), data_to_send.length())) goto failed;
-	if (client->receiveData(received_data, NET_BUFFER_SIZE))          goto failed;
-	if (client->disconnect())                                         goto failed;
+	if (server->handleRequests()) {
+		// fail log here
+		goto failed;
+	}
 
-	if (server->closeServer())                                        goto failed;
+	if (client->connect2server()) {
+		// fail log here
+		goto failed;
+	}
 
+	if (client->sendData(data_to_send.data(), data_to_send.length())) {
+		// fail log here
+		goto failed;
+	}
+
+	if (client->receiveData(received_data.data(), received_data.size())) {
+		// fail log here
+		goto failed;
+	}
+
+	if (client->disconnect()) {
+		// fail log here
+		goto failed;
+	}
+
+	if (server->closeServer()) {
+		// fail log here
+		goto failed;
+	}
+
+	// success log here
+	
 failed:
 	return 0;
 }
