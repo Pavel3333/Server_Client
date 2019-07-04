@@ -46,9 +46,21 @@ Client::~Client() {
 	}
 
 	if (error_msg) printf(error_msg, error_code);
+	else {
+		printf("All received data:\n");
+
+		for (uint16_t i = 0; i < receivedPackets.size(); i++) {
+			printf("%d : %s\n", receivedPackets);
+		}
+	}
 
 	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > CLIENT_STATE::INIT_WINSOCK)  WSACleanup();
+
+	while (!receivedPackets.empty()) {
+		delete receivedPackets.back();
+		receivedPackets.pop_back();
+	}
 }
 
 bool Client::connect2server() {
@@ -93,11 +105,16 @@ bool Client::sendData(const char* data, int size) {
 
 	printf("Bytes sent: %d\n", bytesSent);
 
+	// shutdown the connection since no more data will be sent
+	state = CLIENT_STATE::SHUTDOWN;
+
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return true;
+
 	state = CLIENT_STATE::OK;
 	return false;
 }
 
-bool Client::receiveData(char* data, int size) {
+bool Client::receiveData() {
 	// shutdown the connection since no more data will be sent
 	state = CLIENT_STATE::SHUTDOWN;
 
@@ -106,13 +123,25 @@ bool Client::receiveData(char* data, int size) {
 	// Receive until the peer closes the connection
 	state = CLIENT_STATE::RECEIVE;
 
+	char recStr[NET_BUFFER_SIZE];
+
+	uint16_t bytesRec;
+
 	do {
-		bytesRec = recv(connectSocket, data, size, 0);
-		if      (bytesRec >  0) printf("Bytes received: %d\n", bytesRec);
+		bytesRec = recv(connectSocket, recStr, NET_BUFFER_SIZE, 0);
+		if (bytesRec > 0) { //Записываем данные от сервера
+			printf("Bytes received: %d\n", bytesRec);
+
+			Packet* packet = new Packet{
+				recStr,
+				bytesRec
+			};
+
+			receivedPackets.push_back(packet);
+		}
 		else if (bytesRec == 0) printf("Connection closed\n");
 		else return true;
-	}
-	while (bytesRec > 0);
+	} while (bytesRec > 0);
 
 	state = CLIENT_STATE::OK;
 	return false;

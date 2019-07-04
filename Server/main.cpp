@@ -2,8 +2,7 @@
 
 #include "Server.h"
 
-#define NET_BUFFER_SIZE 512
-#define DEFAULT_PORT    27015
+#define DEFAULT_PORT 27015
 
 bool start() {
 	auto server = std::make_unique<Server>(DEFAULT_PORT);

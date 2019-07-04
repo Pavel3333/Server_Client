@@ -2,6 +2,8 @@
 
 #include "stdafx.h"
 
+#define NET_BUFFER_SIZE 512
+
 enum class [[nodiscard]] ERROR_TYPE : uint8_t{
 	OK = 0,        // Без ошибок
 	WARNING,       // Предупреждение
@@ -20,6 +22,12 @@ enum class [[nodiscard]] CLIENT_STATE : uint8_t {
 	CLOSE_SOCKET
 };
 
+
+struct Packet {
+	char* data;
+	uint16_t size;
+};
+
 class Client {
 public:
 	Client(const char*, uint16_t);
@@ -34,11 +42,12 @@ public:
 	uint16_t port;
 
 	int bytesSent;
-	int bytesRec;
+
+	std::vector<Packet*> receivedPackets;
 
 	bool connect2server();
 	bool sendData(const char*, int);
-	bool receiveData(char*, int);
+	bool receiveData();
 	bool disconnect();
 private:
 	WSADATA wsaData;

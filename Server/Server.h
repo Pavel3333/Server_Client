@@ -2,6 +2,8 @@
 
 #include "stdafx.h"
 
+#define NET_BUFFER_SIZE 512
+
 enum class [[nodiscard]] SERVER_STATE : uint8_t{
 	OK = 0,
 	INIT_WINSOCK,
@@ -11,10 +13,14 @@ enum class [[nodiscard]] SERVER_STATE : uint8_t{
 	LISTEN,
 	CONNECT,
 	RECEIVE,
-	SHUTDOWN_REC,
 	SEND,
-	SHUTDOWN_SEND,
+	SHUTDOWN,
 	CLOSE_SOCKET
+};
+
+struct Packet {
+	char* data;
+	uint16_t size;
 };
 
 class Server {
@@ -28,7 +34,13 @@ public:
 
 	uint16_t port;
 
+	int bytesSent;
+
+	std::vector<Packet*> receivedPackets;
+
 	bool startServer();
+	bool sendData(const char*, int);
+	bool receiveData();
 	bool closeServer();
 	bool handleRequests();
 private:

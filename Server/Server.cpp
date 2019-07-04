@@ -28,9 +28,21 @@ Server::~Server() {
 	//}
 
 	if (error_msg) printf(error_msg, error_code);
+	else {
+		printf("All received data:\n");
+
+		for (uint16_t i = 0; i < receivedPackets.size(); i++) {
+			printf("%d : %s\n", receivedPackets);
+		}
+	}
 
 	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > SERVER_STATE::INIT_WINSOCK)  WSACleanup();
+
+	while (!receivedPackets.empty()) {
+		delete receivedPackets.back();
+		receivedPackets.pop_back();
+	}
 }
 
 bool Server::startServer() {
@@ -80,6 +92,53 @@ bool Server::closeServer() {
 	return false;
 }
 
+bool Server::sendData(const char* data, int size) {
+	// Send an initial buffer
+	state = SERVER_STATE::SEND;
+
+	bytesSent = send(connectSocket, data, size, 0);
+	if (bytesSent == SOCKET_ERROR) return true;
+
+	printf("Bytes sent: %d\n", bytesSent);
+
+	state = SERVER_STATE::OK;
+	return false;
+}
+
+bool Server::receiveData() {
+	// shutdown the connection since no more data will be sent
+	state = SERVER_STATE::SHUTDOWN;
+
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return true;
+
+	// Receive until the peer closes the connection
+	state = SERVER_STATE::RECEIVE;
+
+	char recStr[NET_BUFFER_SIZE];
+
+	uint16_t bytesRec;
+
+	do {
+		bytesRec = recv(connectSocket, recStr, NET_BUFFER_SIZE, 0);
+		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+			printf("Bytes received: %d\n", bytesRec);
+
+			Packet* packet = new Packet {
+				recStr,
+				bytesRec
+			};
+
+			receivedPackets.push_back(packet);
+		}
+		else if (bytesRec == 0) printf("Connection closed\n");
+		else return true;
+	}
+	while (bytesRec > 0);
+
+	state = SERVER_STATE::OK;
+	return false;
+}
+
 bool Server::handleRequests() {
 	// Listening the port
 	state = SERVER_STATE::LISTEN;
@@ -101,9 +160,10 @@ bool Server::handleRequests() {
 		if (!inet_ntop(AF_INET, socketDesc->ai_addr, addr_str, 32)) printf("Cannot to get addr string of server IP\n");
 		else                                                        printf("Client connected from %s (%u)\n", addr_str, ntohs(addr_c.sin_port));
 
+		//добавить клиента в вектор и что-нибудь ему отправить
 		//SClient* client = new SClient(acceptS, addr_c);
 
-		//добавить клиента в вектор, прочитать данные и что-нибудь ему отправить
+		receiveData();
 
 		Sleep(50);
 	}
