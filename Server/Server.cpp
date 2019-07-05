@@ -2,6 +2,18 @@
 
 #include "Server.h"
 
+Packet::Packet(char* data, size_t size) {
+	this->data = new char[size + 2];
+	memcpy(this->data, data, size);
+	this->data[size] = NULL; //NULL-terminator
+
+	this->size = size;
+}
+
+Packet::~Packet() {
+	delete this->data;
+}
+
 Server::Server(uint16_t port) {
 	// »нициализаци€
 	state = SERVER_STATE::OK;
@@ -32,17 +44,16 @@ Server::~Server() {
 		printf("All received data:\n");
 
 		for (uint16_t i = 0; i < receivedPackets.size(); i++) {
-			printf("%d : %s\n", receivedPackets);
+			printf("  %d:\n    size: %d\n    data: %s\n", i, receivedPackets[i]->size, receivedPackets[i]->data);
 		}
 	}
+
+	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
 
 	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > SERVER_STATE::INIT_WINSOCK)  WSACleanup();
 
-	while (!receivedPackets.empty()) {
-		delete receivedPackets.back();
-		receivedPackets.pop_back();
-	}
+	receivedPackets.clear();
 }
 
 bool Server::startServer() {
@@ -73,6 +84,8 @@ bool Server::startServer() {
 
 	if (bind(connectSocket, socketDesc->ai_addr, (int)socketDesc->ai_addrlen) == SOCKET_ERROR) return true;
 
+	freeaddrinfo(socketDesc);
+
 	printf("The server is running\n");
 
 	state = SERVER_STATE::OK;
@@ -80,10 +93,17 @@ bool Server::startServer() {
 }
 
 bool Server::closeServer() {
+	// Shutdown the connection since no more data will be sent
+	state = SERVER_STATE::SHUTDOWN;
+
+	if (shutdown(clientSocket, SD_SEND) == SOCKET_ERROR) return true;
+
 	// Close the socket
 	state = SERVER_STATE::CLOSE_SOCKET;
 
+	if (closesocket(clientSocket)  == SOCKET_ERROR) return true;
 	if (closesocket(connectSocket) == SOCKET_ERROR) return true;
+
 	WSACleanup();
 
 	printf("The server was stopped\n");
@@ -92,46 +112,37 @@ bool Server::closeServer() {
 	return false;
 }
 
-bool Server::sendData(const char* data, int size) {
+bool Server::sendData(std::string_view data) {
 	// Send an initial buffer
 	state = SERVER_STATE::SEND;
 
-	bytesSent = send(connectSocket, data, size, 0);
+	bytesSent = send(clientSocket, data.data(), data.size(), 0);
 	if (bytesSent == SOCKET_ERROR) return true;
 
-	printf("Bytes sent: %d\n", bytesSent);
+	printf("Bytes sent: %d, data: %s\n", bytesSent, data);
 
 	state = SERVER_STATE::OK;
 	return false;
 }
 
 bool Server::receiveData() {
-	// shutdown the connection since no more data will be sent
-	state = SERVER_STATE::SHUTDOWN;
-
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return true;
-
 	// Receive until the peer closes the connection
 	state = SERVER_STATE::RECEIVE;
 
-	char recStr[NET_BUFFER_SIZE];
+	char recBuff[NET_BUFFER_SIZE];
 
-	uint16_t bytesRec;
+	int bytesRec;
 
 	do {
-		bytesRec = recv(connectSocket, recStr, NET_BUFFER_SIZE, 0);
+		bytesRec = recv(clientSocket, recBuff, NET_BUFFER_SIZE, 0);
 		if (bytesRec > 0) { //«аписываем данные от клиента (TODO: писать туда и ID клиента)
-			printf("Bytes received: %d\n", bytesRec);
+			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
 
-			Packet* packet = new Packet {
-				recStr,
-				bytesRec
-			};
-
-			receivedPackets.push_back(packet);
+			printf("Bytes received: %d, data: %s\n", bytesRec, receivedPackets.back()->data);
 		}
 		else if (bytesRec == 0) printf("Connection closed\n");
-		else return true;
+		else
+			return true;
 	}
 	while (bytesRec > 0);
 
@@ -145,12 +156,12 @@ bool Server::handleRequests() {
 
 	if (listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) return true;
 
-	while (true)
-	{
+	while (true) {
 		SOCKADDR_IN addr_c;
 		int addrlen = sizeof(addr_c);
 
-		if (SOCKET clientSocket = accept(connectSocket, (struct sockaddr*)&addr_c, &addrlen) == INVALID_SOCKET) continue;
+		clientSocket = accept(connectSocket, (struct sockaddr*)&addr_c, &addrlen);
+		if (clientSocket == INVALID_SOCKET) continue;
 
 		// Connecting to client
 		state = SERVER_STATE::CONNECT;
@@ -163,7 +174,11 @@ bool Server::handleRequests() {
 		//добавить клиента в вектор и что-нибудь ему отправить
 		//SClient* client = new SClient(acceptS, addr_c);
 
-		receiveData();
+		if(receiveData()) printf("RECEIVE - error: %d", WSAGetLastError());
+
+		std::string_view resp = "Some data from the server";
+
+		if (sendData(resp)) printf("RECEIVE - error: %d", WSAGetLastError());
 
 		Sleep(50);
 	}

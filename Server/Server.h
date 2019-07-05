@@ -2,7 +2,7 @@
 
 #include "stdafx.h"
 
-#define NET_BUFFER_SIZE 512
+#define NET_BUFFER_SIZE 8192
 
 enum class [[nodiscard]] SERVER_STATE : uint8_t{
 	OK = 0,
@@ -19,8 +19,10 @@ enum class [[nodiscard]] SERVER_STATE : uint8_t{
 };
 
 struct Packet {
+	Packet(char* data, size_t size);
+	~Packet();
 	char* data;
-	uint16_t size;
+	size_t size;
 };
 
 class Server {
@@ -36,10 +38,10 @@ public:
 
 	int bytesSent;
 
-	std::vector<Packet*> receivedPackets;
+	std::vector<std::unique_ptr<Packet>> receivedPackets;
 
 	bool startServer();
-	bool sendData(const char*, int);
+	bool sendData(std::string_view);
 	bool receiveData();
 	bool closeServer();
 	bool handleRequests();
@@ -47,6 +49,7 @@ private:
 	char port_str[7];
 
 	SOCKET connectSocket;
+	SOCKET clientSocket;
 
 	WSAData wsaData;
 

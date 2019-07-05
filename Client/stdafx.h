@@ -8,5 +8,10 @@
 
 #include <iostream>
 
+#include <string>
+#include <string_view>
+
+#include <memory>
+
 #include <array>
 #include <vector>

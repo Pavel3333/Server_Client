@@ -2,7 +2,7 @@
 
 #include "stdafx.h"
 
-#define NET_BUFFER_SIZE 512
+#define NET_BUFFER_SIZE 8192
 
 enum class [[nodiscard]] ERROR_TYPE : uint8_t{
 	OK = 0,        // Без ошибок
@@ -22,10 +22,11 @@ enum class [[nodiscard]] CLIENT_STATE : uint8_t {
 	CLOSE_SOCKET
 };
 
-
 struct Packet {
+	Packet(char* data, size_t size);
+	~Packet();
 	char* data;
-	uint16_t size;
+	size_t size;
 };
 
 class Client {
@@ -43,10 +44,10 @@ public:
 
 	int bytesSent;
 
-	std::vector<Packet*> receivedPackets;
+	std::vector<std::unique_ptr<Packet>> receivedPackets;
 
 	bool connect2server();
-	bool sendData(const char*, int);
+	bool sendData(std::string_view);
 	bool receiveData();
 	bool disconnect();
 private:

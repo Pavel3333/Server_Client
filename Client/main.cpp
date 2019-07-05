@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include <memory>
 #include "Client.h"
 
 #define NET_BUFFER_SIZE 512
@@ -7,14 +6,14 @@
 #define SERVER_IP       "127.0.0.1"
 
 bool start() {
-	std::string_view                  data_to_send = "Send me please";
+	std::string_view data_to_send = "Send me please";
 
 	auto client = std::make_unique<Client>(SERVER_IP, DEFAULT_PORT);
 
-	if (client->connect2server())                                   return true;
-	if (client->sendData(data_to_send.data(), data_to_send.size())) return true;
-	if (client->receiveData())                                      return true;
-	if (client->disconnect())                                       return true;
+	if (client->connect2server())       return true;
+	if (client->sendData(data_to_send)) return true;
+	if (client->receiveData())          return true;
+	if (client->disconnect())           return true;
 
 	return false;
 }
