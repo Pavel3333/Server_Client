@@ -1,10 +1,10 @@
 #pragma once
+#include <vector>
 
-#include "stdafx.h"
+constexpr uint16_t NET_BUFFER_SIZE = 512;
 
-#define NET_BUFFER_SIZE 512
 
-enum class [[nodiscard]] SERVER_STATE : uint8_t{
+enum class SERVER_STATE {
 	OK = 0,
 	INIT_WINSOCK,
 	GET_ADDR,
@@ -18,38 +18,25 @@ enum class [[nodiscard]] SERVER_STATE : uint8_t{
 	CLOSE_SOCKET
 };
 
-struct Packet {
-	char* data;
-	uint16_t size;
-};
 
 class Server {
 public:
-	Server(uint16_t);
+	Server(USHORT port);
 	~Server();
 
-	int error_code;
+	int startServer();
+	int sendData(std::string_view);
+	int receiveData(SOCKET clientSocket);
+	int closeServer();
+	int handleRequests();
 
-	SERVER_STATE state;
-
-	uint16_t port;
-
-	int bytesSent;
-
-	std::vector<Packet*> receivedPackets;
-
-	bool startServer();
-	bool sendData(const char*, int);
-	bool receiveData();
-	bool closeServer();
-	bool handleRequests();
 private:
-	char port_str[7];
+	void setState(SERVER_STATE state);
 
+	std::vector<std::string_view> receivedPackets;
+	SERVER_STATE state;
+	USHORT port;
+
+	WSADATA wsData;
 	SOCKET connectSocket;
-
-	WSAData wsaData;
-
-	struct addrinfo  socketDescTemp;
-	struct addrinfo* socketDesc;
 };
