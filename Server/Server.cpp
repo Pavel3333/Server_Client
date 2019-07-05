@@ -2,12 +2,14 @@
 #include <string>
 #include "Server.h"
 
-Packet::Packet(char* data, size_t size) {
+Packet::Packet(char* data, size_t size)
+	: size(size)
+{
 	this->data = new char[size + 2];
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
-	this->size = size;
+	cout << "Packet received: " << size << ", data: " << this->data << endl;
 }
 
 Packet::~Packet() {
@@ -24,13 +26,15 @@ Server::Server(USHORT port)
 
 Server::~Server()
 {
-	if (receivedPackets.size()) {
+	if (state > SERVER_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
+
+	if (state != SERVER_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
+	else if (!receivedPackets.empty()) {
 		cout << "All received data:" << endl;
 		size_t i = 1;
-		for (auto& it : receivedPackets) {
-			cout << i << ":" << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
-			i++;
-		}
+
+		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+		
 		receivedPackets.clear();
 	}
 
@@ -38,7 +42,6 @@ Server::~Server()
 
 	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > SERVER_STATE::INIT_WINSOCK)  WSACleanup();
-
 }
 
 
@@ -122,7 +125,7 @@ int Server::sendData(string_view data) {
 	int bytesSent = send(clientSocket, data.data(), data.size(), 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
-	cout << "Bytes sent: " << bytesSent << ", data: " << data << endl;
+	cout << "Bytes sent: " << bytesSent << ", data: " << data.data() << endl;
 
 	setState(SERVER_STATE::OK);
 	return 0;
@@ -140,11 +143,13 @@ int Server::receiveData(SOCKET clientSocket) {
 		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
 			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
 
-			cout << "Bytes received: " << bytesRec << ", data: " << receivedPackets.back()->data << endl;
+			std::string_view resp = "Some data from the server";
+
+			if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
 		}
 		else if (bytesRec == 0) cout << "Connection closed" << endl;
 		else
-			return true;
+			return 1;
 	}
 	while (bytesRec > 0);
 
@@ -161,10 +166,8 @@ int Server::handleRequests()
 	while (true) {
 		cout << "Wait for client..." << endl;
 
-		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
-		if (clientSocket == INVALID_SOCKET) {
-			continue;
-		}
+		clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
+		if (clientSocket == INVALID_SOCKET) continue;
 
 		char host[NI_MAXHOST];
 		char service[NI_MAXSERV];
@@ -172,24 +175,16 @@ int Server::handleRequests()
 		ZeroMemory(host, NI_MAXHOST);
 		ZeroMemory(service, NI_MAXSERV);
 
-		int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0);
-		if (!err) {
-			cout << host << " connected on port " << service << endl;
-		}
-		else {
+		if (int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0)) {
 			inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-			cout << host << " connected on port " <<
-				ntohs(client.sin_port) << endl;
+			cout << host << " connected on port " << ntohs(client.sin_port) << endl;
 		}
+		else cout << host << " connected on port " << service << endl;
 
 		// Connecting to client
 		setState(SERVER_STATE::CONNECT);
 
 		if (receiveData(clientSocket)) cout << "RECEIVE - error: " << WSAGetLastError() << endl;
-
-		std::string_view resp = "Some data from the server";
-
-		if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
 
 		Sleep(100);
 	}

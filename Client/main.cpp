@@ -1,29 +1,30 @@
-#include "stdafx.h"
+#include "pch.h"
+
 #include "Client.h"
 
-#define NET_BUFFER_SIZE 512
-#define DEFAULT_PORT    27015
-#define SERVER_IP       "127.0.0.1"
+constexpr uint16_t    DEFAULT_PORT = 27015;
+constexpr const char* SERVER_IP    = "127.0.0.1";
 
-bool start() {
+
+int start() {
 	std::string_view data_to_send = "Send me please";
 
 	auto client = std::make_unique<Client>(SERVER_IP, DEFAULT_PORT);
 
-	if (client->connect2server())       return true;
-	if (client->sendData(data_to_send)) return true;
-	if (client->receiveData())          return true;
-	if (client->disconnect())           return true;
+	if (client->connect2server())       return 1;
+	if (client->sendData(data_to_send)) return 2;
+	if (client->receiveData())          return 3;
+	if (client->disconnect())           return 4;
 
-	return false;
+	return 0;
 }
 
 int main()
 {
-	if (!start()) printf("Client created successfully!\n");
-	else          printf("Client creating failed\n");
+	if (int err = start()) cout << "Client creating failed - error: " << err << endl;
+	else                   cout << "Client created successfully!" << endl;
 
-	std::getchar(); // Чтобы не закрывалось окно
+	(void)std::cin.get(); //Чтобы не закрывалось окно
 
 	return 0;
 }

@@ -35,27 +35,24 @@ public:
 	int receiveData(SOCKET clientSocket);
 	int closeServer();
 	int handleRequests();
-
 private:
 	void setState(SERVER_STATE state);
 
-	std::vector<std::string_view> receivedPackets;
 	SERVER_STATE state;
 
 	uint16_t port;
 
 	int bytesSent;
+	int error_code;
 
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 
-	bool startServer();
-	bool sendData(std::string_view);
-	bool receiveData();
-	bool closeServer();
-	bool handleRequests();
-private:
 	char port_str[7];
 
 	WSADATA wsData;
+
 	SOCKET connectSocket;
+	SOCKET clientSocket;
+
+	struct addrinfo* socketDesc;
 };

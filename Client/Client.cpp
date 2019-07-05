@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 
 #include "Client.h"
 
@@ -7,6 +7,8 @@ Packet::Packet(char* data, size_t size) {
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
+	cout << "Packet received: " << size << ", data: " << this->data << endl;
+
 	this->size = size;
 }
 
@@ -14,14 +16,12 @@ Packet::~Packet() {
 	delete this->data;
 }
 
-Client::Client(const char* IP, uint16_t port) {
-	// Инициализация
-	state = CLIENT_STATE::OK;
-
-	connectSocket = INVALID_SOCKET;
-
-	this->IP   = IP;
-	this->port = port;
+Client::Client(PCSTR IP, USHORT port)
+	: connectSocket(INVALID_SOCKET)
+	, port(port)
+	, IP(IP)
+{
+	setState(CLIENT_STATE::OK);
 }
 
 Client::~Client() {
@@ -29,60 +29,31 @@ Client::~Client() {
 
 	// Вывод сообщения об ошибке
 
-	const char* error_msg = nullptr;
+	if (state != CLIENT_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
+	else if (!receivedPackets.empty()) {
+		cout << "All received data:" << endl;
+		size_t i = 1;
 
-	switch (state)
-	{
-	case CLIENT_STATE::INIT_WINSOCK:
-		error_msg = "INIT_WINSOCK - error: %d\n";
-		break;
-	case CLIENT_STATE::CREATE_SOCKET:
-		error_msg = "CREATE_SOCKET - error: %d\n";
-		break;
-	case CLIENT_STATE::CONNECT:
-		error_msg = "CONNECT - error: %d\n";
-		break;
-	case CLIENT_STATE::SEND:
-		error_msg = "SEND - error: %d\n";
-		break;
-	case CLIENT_STATE::SHUTDOWN:
-		error_msg = "SHUTDOWN - error: %d\n";
-		break;
-	case CLIENT_STATE::RECEIVE:
-		error_msg = "RECEIVE - error: %d\n";
-		break;
-	case CLIENT_STATE::CLOSE_SOCKET:
-		error_msg = "CLOSE_SOCKET - error: %d\n";
-		break;
-	default: break;
-	}
+		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
 
-	if (error_msg) printf(error_msg, error_code);
-	else {
-		printf("All received data:\n");
-
-		for (uint16_t i = 0; i < receivedPackets.size(); i++) {
-			printf("  %d:\n    size: %d\n    data: %s\n", i, receivedPackets[i]->size, receivedPackets[i]->data);
-		}
+		receivedPackets.clear();
 	}
 
 	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > CLIENT_STATE::INIT_WINSOCK)  WSACleanup();
-
-	receivedPackets.clear();
 }
 
-bool Client::connect2server() {
+int Client::connect2server() {
 	// Initialize Winsock
-	state = CLIENT_STATE::INIT_WINSOCK;
+	setState(CLIENT_STATE::INIT_WINSOCK);
 
-	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) return true;
+	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) return 1;
 
 	// Create a SOCKET for connecting to server (TCP/IP protocol)
-	state = CLIENT_STATE::CREATE_SOCKET;
+	setState(CLIENT_STATE::CREATE_SOCKET);
 
 	connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (connectSocket == INVALID_SOCKET) return true;
+	if (connectSocket == INVALID_SOCKET) return 1;
 
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port of the server to be connected to.
@@ -92,72 +63,101 @@ bool Client::connect2server() {
 	inet_pton(AF_INET, IP, &socketDesc.sin_addr.s_addr);
 
 	// Connect to server.
-	state = CLIENT_STATE::CONNECT;
+	setState(CLIENT_STATE::CONNECT);
 
-	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return true;
+	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
 
 	char addr_str[16];
 
-	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) printf("Cannot to get addr string of server IP\n");
-	else                                                           printf("The client was connected to the server %s (%u)\n", addr_str, ntohs(socketDesc.sin_port));
+	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) cout << "Cannot to get addr string of server IP" << endl;
+	else                                                           cout << "The client was connected to the server " << addr_str << ':' << ntohs(socketDesc.sin_port) << endl;
 
-	state = CLIENT_STATE::OK;
-	return false;
+	setState(CLIENT_STATE::OK);
+	return 0;
 }
 
-bool Client::sendData(std::string_view data) {
+int Client::sendData(std::string_view data) {
 	// Send an initial buffer
-	state = CLIENT_STATE::SEND;
+	setState(CLIENT_STATE::SEND);
 
 	bytesSent = send(connectSocket, data.data(), data.size(), 0);
-	if (bytesSent == SOCKET_ERROR) return true;
+	if (bytesSent == SOCKET_ERROR) return 1;
 
-	printf("Bytes sent: %d, data: %s\n", bytesSent, data);
+	cout << "Bytes sent: " << bytesSent << ", data: " << data << endl;
 
-	state = CLIENT_STATE::OK;
-	return false;
+	setState(CLIENT_STATE::OK);
+	return 0;
 }
 
-bool Client::receiveData() {
+int Client::receiveData() {
 	// Receive until the peer closes the connection
-	state = CLIENT_STATE::RECEIVE;
+	setState(CLIENT_STATE::RECEIVE);
 
 	char recBuff[NET_BUFFER_SIZE];
 
 	int bytesRec;
+	size_t counter = 0;
 
 	do {
 		bytesRec = recv(connectSocket, recBuff, NET_BUFFER_SIZE, 0);
 		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
 			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
 
-			printf("Bytes received: %d, data: %s\n", bytesRec, receivedPackets.back()->data);
-		}
-		else if (bytesRec == 0) printf("Connection closed\n");
-		else
-			return true;
-	}
-	while (bytesRec > 0);
+			std::string_view resp = "Some data from the client, please check it";
 
-	state = CLIENT_STATE::OK;
-	return false;
+			if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
+
+			counter++;
+		}
+		else if (bytesRec == 0) cout << "Connection closed" << endl;
+		else
+			return 1;
+	}
+	while (bytesRec > 0 && counter < 30);
+
+	setState(CLIENT_STATE::OK);
+	return 0;
 }
 
-bool Client::disconnect() {
+int Client::disconnect() {
 	// Shutdown the connection since no more data will be sent
-	state = CLIENT_STATE::SHUTDOWN;
+	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return true;
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return 1;
 
 	// Close the socket
-	state = CLIENT_STATE::CLOSE_SOCKET;
+	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) return true;
+	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
 
 	WSACleanup();
 
-	printf("The client was stopped\n");
+	cout << "The client was stopped" << endl;
 
-	state = CLIENT_STATE::OK;
-	return false;
+	setState(CLIENT_STATE::OK);
+	return 0;
+}
+
+void Client::setState(CLIENT_STATE state)
+{
+#define PRINT_STATE(X) case CLIENT_STATE::X:           \
+	std::cout << "State changed to: " #X << std::endl; \
+	break;
+
+	switch (state) {
+		PRINT_STATE(OK);
+		PRINT_STATE(INIT_WINSOCK);
+		PRINT_STATE(CREATE_SOCKET);
+		PRINT_STATE(CONNECT);
+		PRINT_STATE(SEND);
+		PRINT_STATE(SHUTDOWN);
+		PRINT_STATE(RECEIVE);
+		PRINT_STATE(CLOSE_SOCKET);
+	default:
+		std::cout << "Unknown state: " << (int)state << std::endl;
+		return;
+	}
+#undef PRINT_STATE
+
+	this->state = state;
 }

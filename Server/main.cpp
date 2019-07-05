@@ -1,43 +1,25 @@
 #include "pch.h"
 #include "Server.h"
 
-constexpr uint16_t DEFAULT_PORT = 27010;
+constexpr uint16_t DEFAULT_PORT = 27015;
 
 
 int start()
 {
 	auto server = make_unique<Server>(DEFAULT_PORT);
 
-	cout << "[server] startServer" << endl;
-	if (server->startServer()) {
-		return 1;
-	}
-
-	cout << "[server] handleRequests" << endl;
-	if (server->handleRequests()) {
-		return 2;
-	}
-
-	cout << "[server] closeServer" << endl;
-	if (server->closeServer()) {
-		return 3;
-	}
+	if (server->startServer())    return 1;
+	if (server->handleRequests()) return 2;
+	if (server->closeServer())    return 3;
 
 	return 0;
 }
 
 int main()
 {
-	int err = start();
+	if (int err = start()) cout << "Server creating failed - error: " << err << endl;
+	else                   cout << "Server created successfully!" << endl;
 
-	if (!err) {
-		cout << "Server created successfully!" << endl;
-	}
-	else {
-		cout << "Server creating failed" << endl;
-		return err;
-	}
-
-	// (void)std::cin.get();
+	(void)std::cin.get(); //Чтобы не закрывалось окно
 	return 0;
 }

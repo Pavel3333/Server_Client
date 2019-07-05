@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdafx.h"
+#include "pch.h"
 
 #define NET_BUFFER_SIZE 8192
 
@@ -31,14 +31,14 @@ struct Packet {
 
 class Client {
 public:
-	Client(const char*, uint16_t);
+	Client(PCSTR, uint16_t);
 	~Client();
 
 	int error_code;
 
 	CLIENT_STATE state;
 
-	const char* IP;
+	PCSTR IP;
 
 	uint16_t port;
 
@@ -46,11 +46,13 @@ public:
 
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 
-	bool connect2server();
-	bool sendData(std::string_view);
-	bool receiveData();
-	bool disconnect();
+	int connect2server();
+	int sendData(std::string_view);
+	int receiveData();
+	int disconnect();
 private:
+	void setState(CLIENT_STATE state);
+
 	WSADATA wsaData;
 
 	SOCKET connectSocket;
