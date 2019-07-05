@@ -1,22 +1,43 @@
-#include "stdafx.h"
-
+#include "pch.h"
 #include "Server.h"
 
-#define DEFAULT_PORT 27015
+constexpr uint16_t DEFAULT_PORT = 27010;
 
-bool start() {
-	auto server = std::make_unique<Server>(DEFAULT_PORT);
 
-	if (server->startServer())    return true;
-	if (server->handleRequests()) return true;
-	if (server->closeServer())    return true;
+int start()
+{
+	auto server = make_unique<Server>(DEFAULT_PORT);
 
-	return false;
+	cout << "[server] startServer" << endl;
+	if (server->startServer()) {
+		return 1;
+	}
+
+	cout << "[server] handleRequests" << endl;
+	if (server->handleRequests()) {
+		return 2;
+	}
+
+	cout << "[server] closeServer" << endl;
+	if (server->closeServer()) {
+		return 3;
+	}
+
+	return 0;
 }
 
-int main() {
-	if (!start()) printf("Server created successfully!\n");
-	else          printf("Server creating failed\n");
+int main()
+{
+	int err = start();
 
+	if (!err) {
+		cout << "Server created successfully!" << endl;
+	}
+	else {
+		cout << "Server creating failed" << endl;
+		return err;
+	}
+
+	// (void)std::cin.get();
 	return 0;
 }

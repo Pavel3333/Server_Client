@@ -1,10 +1,10 @@
 #pragma once
+#include <vector>
 
-#include "stdafx.h"
+constexpr uint16_t NET_BUFFER_SIZE = 8192;
 
-#define NET_BUFFER_SIZE 8192
 
-enum class [[nodiscard]] SERVER_STATE : uint8_t{
+enum class SERVER_STATE {
 	OK = 0,
 	INIT_WINSOCK,
 	GET_ADDR,
@@ -27,11 +27,19 @@ struct Packet {
 
 class Server {
 public:
-	Server(uint16_t);
+	Server(USHORT port);
 	~Server();
 
-	int error_code;
+	int startServer();
+	int sendData(std::string_view);
+	int receiveData(SOCKET clientSocket);
+	int closeServer();
+	int handleRequests();
 
+private:
+	void setState(SERVER_STATE state);
+
+	std::vector<std::string_view> receivedPackets;
 	SERVER_STATE state;
 
 	uint16_t port;
@@ -48,11 +56,6 @@ public:
 private:
 	char port_str[7];
 
+	WSADATA wsData;
 	SOCKET connectSocket;
-	SOCKET clientSocket;
-
-	WSAData wsaData;
-
-	struct addrinfo  socketDescTemp;
-	struct addrinfo* socketDesc;
 };

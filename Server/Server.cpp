@@ -1,5 +1,5 @@
-#include "stdafx.h"
-
+#include "pch.h"
+#include <string>
 #include "Server.h"
 
 Packet::Packet(char* data, size_t size) {
@@ -14,38 +14,24 @@ Packet::~Packet() {
 	delete this->data;
 }
 
-Server::Server(uint16_t port) {
-	// Инициализация
-	state = SERVER_STATE::OK;
-
-	connectSocket = INVALID_SOCKET;
-	socketDesc = nullptr;
-
-	this->port = port;
-
-	_itoa_s(this->port, const_cast<char*>(this->port_str), 7, 10);
+Server::Server(USHORT port)
+    : connectSocket(INVALID_SOCKET)
+	, port(port)
+{
+	setState(SERVER_STATE::OK);
 }
 
-Server::~Server() {
-	if (state > SERVER_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
-	// Вывод сообщения об ошибке
-
-	const char* error_msg = nullptr;
-
-	//TODO
-	//switch (state)
-	//{
-	//	...
-	//}
-
-	if (error_msg) printf(error_msg, error_code);
-	else {
-		printf("All received data:\n");
-
-		for (uint16_t i = 0; i < receivedPackets.size(); i++) {
-			printf("  %d:\n    size: %d\n    data: %s\n", i, receivedPackets[i]->size, receivedPackets[i]->data);
+Server::~Server()
+{
+	if (receivedPackets.size()) {
+		cout << "All received data:" << endl;
+		size_t i = 1;
+		for (auto& it : receivedPackets) {
+			cout << i << ":" << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+			i++;
 		}
+		receivedPackets.clear();
 	}
 
 	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
@@ -53,136 +39,187 @@ Server::~Server() {
 	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
 	if (state > SERVER_STATE::INIT_WINSOCK)  WSACleanup();
 
-	receivedPackets.clear();
 }
 
-bool Server::startServer() {
+
+int Server::startServer()
+{
 	// Initialize Winsock
-	state = SERVER_STATE::INIT_WINSOCK;
+	setState(SERVER_STATE::INIT_WINSOCK);
 
-	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) return true;
-
-	// Resolve the server address and port
-	state = SERVER_STATE::GET_ADDR;
-
-	ZeroMemory(&socketDescTemp, sizeof(socketDescTemp));
-	socketDescTemp.ai_family   = AF_INET;
-	socketDescTemp.ai_socktype = SOCK_STREAM;
-	socketDescTemp.ai_protocol = IPPROTO_TCP;
-	socketDescTemp.ai_flags    = AI_PASSIVE;
-
-	if (getaddrinfo(NULL, port_str, &socketDescTemp, &socketDesc)) return true;
+	int err = WSAStartup(MAKEWORD(2, 2), &wsData);
+	if (err) {
+		return 1;
+	}
 
 	// Create a SOCKET for connecting to clients (TCP/IP protocol)
-	state = SERVER_STATE::CREATE_SOCKET;
+	setState(SERVER_STATE::CREATE_SOCKET);
 
-	connectSocket = socket(socketDesc->ai_family, socketDesc->ai_socktype, socketDesc->ai_protocol);
-	if (connectSocket == INVALID_SOCKET) return true;
+	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (connectSocket == INVALID_SOCKET) {
+		return 2;
+	}
 
 	// Bind the socket
-	state = SERVER_STATE::BIND;
+	setState(SERVER_STATE::BIND);
 
-	if (bind(connectSocket, socketDesc->ai_addr, (int)socketDesc->ai_addrlen) == SOCKET_ERROR) return true;
+	sockaddr_in hint;
+	ZeroMemory(&hint, sizeof(hint));
+	hint.sin_family = AF_INET;
+	hint.sin_port = htons(port);
+	hint.sin_addr.S_un.S_addr = INADDR_ANY;
+
+	err = bind(connectSocket, (sockaddr*)&hint, sizeof(hint));
+	if (err == SOCKET_ERROR) {
+		closesocket(connectSocket);
+		return 3;
+	}
+
+	// Listening the port
+	setState(SERVER_STATE::LISTEN);
+
+	err = listen(connectSocket, SOMAXCONN);
+	if (err == SOCKET_ERROR) {
+		closesocket(connectSocket);
+		return 1;
+	}
 
 	freeaddrinfo(socketDesc);
 
-	printf("The server is running\n");
+	cout << "The server is running" << endl;
 
-	state = SERVER_STATE::OK;
-	return false;
+	setState(SERVER_STATE::OK);
+	return 0;
 }
 
-bool Server::closeServer() {
-	// Shutdown the connection since no more data will be sent
-	state = SERVER_STATE::SHUTDOWN;
 
-	if (shutdown(clientSocket, SD_SEND) == SOCKET_ERROR) return true;
+int Server::closeServer()
+{
+	// Shutdown the connection since no more data will be sent
+	setState(SERVER_STATE::SHUTDOWN);
+
+	if (shutdown(clientSocket, SD_SEND) == SOCKET_ERROR) return 1;
 
 	// Close the socket
-	state = SERVER_STATE::CLOSE_SOCKET;
+	setState(SERVER_STATE::CLOSE_SOCKET);
 
-	if (closesocket(clientSocket)  == SOCKET_ERROR) return true;
-	if (closesocket(connectSocket) == SOCKET_ERROR) return true;
+	if (closesocket(clientSocket)  == SOCKET_ERROR) return 1;
+	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
 
 	WSACleanup();
 
-	printf("The server was stopped\n");
+	cout << "The server was stopped" << endl;
 
-	state = SERVER_STATE::OK;
-	return false;
+	setState(SERVER_STATE::OK);
+	return 0;
 }
 
-bool Server::sendData(std::string_view data) {
+
+int Server::sendData(string_view data) {
 	// Send an initial buffer
-	state = SERVER_STATE::SEND;
+	setState(SERVER_STATE::SEND);
 
-	bytesSent = send(clientSocket, data.data(), data.size(), 0);
-	if (bytesSent == SOCKET_ERROR) return true;
+	int bytesSent = send(clientSocket, data.data(), data.size(), 0);
+	if (bytesSent == SOCKET_ERROR) return 1;
 
-	printf("Bytes sent: %d, data: %s\n", bytesSent, data);
+	cout << "Bytes sent: " << bytesSent << ", data: " << data << endl;
 
-	state = SERVER_STATE::OK;
-	return false;
+	setState(SERVER_STATE::OK);
+	return 0;
 }
 
-bool Server::receiveData() {
+int Server::receiveData(SOCKET clientSocket) {
 	// Receive until the peer closes the connection
-	state = SERVER_STATE::RECEIVE;
+	setState(SERVER_STATE::RECEIVE);
 
 	char recBuff[NET_BUFFER_SIZE];
-
 	int bytesRec;
 
 	do {
 		bytesRec = recv(clientSocket, recBuff, NET_BUFFER_SIZE, 0);
-		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+		if (bytesRec > 0) { //Р—Р°РїРёСЃС‹РІР°РµРј РґР°РЅРЅС‹Рµ РѕС‚ РєР»РёРµРЅС‚Р° (TODO: РїРёСЃР°С‚СЊ С‚СѓРґР° Рё ID РєР»РёРµРЅС‚Р°)
 			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
 
-			printf("Bytes received: %d, data: %s\n", bytesRec, receivedPackets.back()->data);
+			cout << "Bytes received: " << bytesRec << ", data: " << receivedPackets.back()->data << endl;
 		}
-		else if (bytesRec == 0) printf("Connection closed\n");
+		else if (bytesRec == 0) cout << "Connection closed" << endl;
 		else
 			return true;
 	}
 	while (bytesRec > 0);
 
-	state = SERVER_STATE::OK;
-	return false;
+	setState(state);
+	return 0;
 }
 
-bool Server::handleRequests() {
-	// Listening the port
-	state = SERVER_STATE::LISTEN;
 
-	if (listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) return true;
+int Server::handleRequests()
+{
+	sockaddr_in client;
+	int clientlen = sizeof(client);
 
 	while (true) {
-		SOCKADDR_IN addr_c;
-		int addrlen = sizeof(addr_c);
+		cout << "Wait for client..." << endl;
 
-		clientSocket = accept(connectSocket, (struct sockaddr*)&addr_c, &addrlen);
-		if (clientSocket == INVALID_SOCKET) continue;
+		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
+		if (clientSocket == INVALID_SOCKET) {
+			continue;
+		}
+
+		char host[NI_MAXHOST];
+		char service[NI_MAXSERV];
+
+		ZeroMemory(host, NI_MAXHOST);
+		ZeroMemory(service, NI_MAXSERV);
+
+		int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0);
+		if (!err) {
+			cout << host << " connected on port " << service << endl;
+		}
+		else {
+			inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
+			cout << host << " connected on port " <<
+				ntohs(client.sin_port) << endl;
+		}
 
 		// Connecting to client
-		state = SERVER_STATE::CONNECT;
+		setState(SERVER_STATE::CONNECT);
 
-		char addr_str[16];
-
-		if (!inet_ntop(AF_INET, socketDesc->ai_addr, addr_str, 32)) printf("Cannot to get addr string of server IP\n");
-		else                                                        printf("Client connected from %s (%u)\n", addr_str, ntohs(addr_c.sin_port));
-
-		//добавить клиента в вектор и что-нибудь ему отправить
-		//SClient* client = new SClient(acceptS, addr_c);
-
-		if(receiveData()) printf("RECEIVE - error: %d", WSAGetLastError());
+		if (receiveData(clientSocket)) cout << "RECEIVE - error: " << WSAGetLastError() << endl;
 
 		std::string_view resp = "Some data from the server";
 
-		if (sendData(resp)) printf("RECEIVE - error: %d", WSAGetLastError());
+		if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
 
-		Sleep(50);
+		Sleep(100);
 	}
-	
-	state = SERVER_STATE::OK;
-	return false;
+
+	setState(SERVER_STATE::OK);
+	return 0;
+}
+
+
+void Server::setState(SERVER_STATE state)
+{
+#define PRINT_STATE(X) case SERVER_STATE:: X: \
+	std::cout << "state changed to: " #X << std::endl; \
+	break;
+
+	switch (state) {
+		PRINT_STATE(OK);
+		PRINT_STATE(INIT_WINSOCK);
+		PRINT_STATE(GET_ADDR);
+		PRINT_STATE(CREATE_SOCKET);
+		PRINT_STATE(BIND);
+		PRINT_STATE(LISTEN);
+		PRINT_STATE(CONNECT);
+		PRINT_STATE(RECEIVE);
+		PRINT_STATE(SEND);
+		PRINT_STATE(SHUTDOWN);
+	default:
+		std::cout << "unknown state: " << (int)state << std::endl;
+	}
+#undef PRINT_STATE
+
+	this->state = state;
 }
