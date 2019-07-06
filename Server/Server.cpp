@@ -11,7 +11,11 @@ Packet::Packet(const char* data, size_t size) {
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
-	cout << "Packet: " << size << ", data: " << this->data << endl;
+#ifdef _DEBUG
+	cout << "Packet: " << size << ", data: ";
+#endif
+
+	cout << this->data << endl;
 }
 
 Packet::~Packet() {
@@ -32,10 +36,12 @@ Server::~Server()
 
 	if (state != SERVER_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
 	else if (!receivedPackets.empty()) {
+#ifdef _DEBUG
 		cout << "All received data:" << endl;
 		size_t i = 1;
 
 		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+#endif
 		
 		receivedPackets.clear();
 	}
@@ -203,6 +209,7 @@ int Server::handleRequests()
 
 void Server::setState(SERVER_STATE state)
 {
+#ifdef _DEBUG
 #define PRINT_STATE(X) case SERVER_STATE:: X: \
 	std::cout << "state changed to: " #X << std::endl; \
 	break;
@@ -222,6 +229,7 @@ void Server::setState(SERVER_STATE state)
 		std::cout << "unknown state: " << (int)state << std::endl;
 	}
 #undef PRINT_STATE
+#endif
 
 	this->state = state;
 }
