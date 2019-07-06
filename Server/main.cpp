@@ -20,6 +20,8 @@ int main()
 	if (int err = start()) cout << "Server creating failed - error: " << err << endl;
 	else                   cout << "Server created successfully!" << endl;
 
-	(void)std::cin.get(); //Чтобы не закрывалось окно
+	int v;
+	std::cin >> v; //Чтобы не закрывалось окно
+
 	return 0;
 }

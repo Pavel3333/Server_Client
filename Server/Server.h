@@ -19,7 +19,7 @@ enum class SERVER_STATE {
 };
 
 struct Packet {
-	Packet(char* data, size_t size);
+	Packet(const char* data, size_t size = 0);
 	~Packet();
 	char* data;
 	size_t size;
@@ -31,7 +31,7 @@ public:
 	~Server();
 
 	int startServer();
-	int sendData(std::string_view);
+	int sendData();
 	int receiveData(SOCKET clientSocket);
 	int closeServer();
 	int handleRequests();
@@ -46,6 +46,7 @@ private:
 	int error_code;
 
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
+	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
 	char port_str[7];
 

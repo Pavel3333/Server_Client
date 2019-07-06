@@ -4,14 +4,14 @@
 
 #define NET_BUFFER_SIZE 8192
 
-enum class [[nodiscard]] ERROR_TYPE : uint8_t{
+enum class ERROR_TYPE : uint8_t{
 	OK = 0,        // Без ошибок
 	WARNING,       // Предупреждение
 	SOFT_ERROR,    // Ошибка
 	CRITICAL_ERROR // Критическая ошибка
 };
 
-enum class [[nodiscard]] CLIENT_STATE : uint8_t {
+enum class CLIENT_STATE : uint8_t {
 	OK = 0,
 	INIT_WINSOCK,
 	CREATE_SOCKET,
@@ -23,7 +23,7 @@ enum class [[nodiscard]] CLIENT_STATE : uint8_t {
 };
 
 struct Packet {
-	Packet(char* data, size_t size);
+	Packet(const char* data, size_t size = 0);
 	~Packet();
 	char* data;
 	size_t size;
@@ -31,7 +31,7 @@ struct Packet {
 
 class Client {
 public:
-	Client(PCSTR, uint16_t);
+	Client(PCSTR, USHORT);
 	~Client();
 
 	int error_code;
@@ -45,9 +45,10 @@ public:
 	int bytesSent;
 
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
+	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
 	int connect2server();
-	int sendData(std::string_view);
+	int sendData();
 	int receiveData();
 	int disconnect();
 private:

@@ -2,14 +2,16 @@
 #include <string>
 #include "Server.h"
 
-Packet::Packet(char* data, size_t size)
-	: size(size)
-{
+Packet::Packet(const char* data, size_t size) {
+	if (!size) size = strnlen_s(data, NET_BUFFER_SIZE);
+
+	this->size = size;
+
 	this->data = new char[size + 2];
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
-	cout << "Packet received: " << size << ", data: " << this->data << endl;
+	cout << "Packet: " << size << ", data: " << this->data << endl;
 }
 
 Packet::~Packet() {
@@ -118,14 +120,21 @@ int Server::closeServer()
 }
 
 
-int Server::sendData(string_view data) {
+int Server::sendData() {
 	// Send an initial buffer
 	setState(SERVER_STATE::SEND);
 
-	int bytesSent = send(clientSocket, data.data(), data.size(), 0);
+	std::string req;
+
+	cout << "Type what you want to send to client: " << endl << '>';
+	std::getline(std::cin, req);
+
+	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
+
+	int bytesSent = send(clientSocket, packet->data, packet->size, 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
-	cout << "Bytes sent: " << bytesSent << ", data: " << data.data() << endl;
+	sendedPackets.push_back(std::move(packet));
 
 	setState(SERVER_STATE::OK);
 	return 0;
@@ -135,23 +144,21 @@ int Server::receiveData(SOCKET clientSocket) {
 	// Receive until the peer closes the connection
 	setState(SERVER_STATE::RECEIVE);
 
-	char recBuff[NET_BUFFER_SIZE];
-	int bytesRec;
+	char respBuff[NET_BUFFER_SIZE];
+	int respSize;
 
 	do {
-		bytesRec = recv(clientSocket, recBuff, NET_BUFFER_SIZE, 0);
-		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
+		respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
+		if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+			receivedPackets.push_back(std::make_unique<Packet>(respBuff, respSize));
 
-			std::string_view resp = "Some data from the server";
-
-			if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
+			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
 		}
-		else if (bytesRec == 0) cout << "Connection closed" << endl;
+		else if (respSize == 0) cout << "Connection closed" << endl;
 		else
 			return 1;
 	}
-	while (bytesRec > 0);
+	while (respSize > 0);
 
 	setState(state);
 	return 0;

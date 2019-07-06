@@ -2,14 +2,16 @@
 
 #include "Client.h"
 
-Packet::Packet(char* data, size_t size) {
+Packet::Packet(const char* data, size_t size) {
+	if (!size) size = strnlen_s(data, NET_BUFFER_SIZE);
+
+	this->size = size;
+
 	this->data = new char[size + 2];
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
-	cout << "Packet received: " << size << ", data: " << this->data << endl;
-
-	this->size = size;
+	cout << "Packet: " << size << ", data: " << this->data << endl;
 }
 
 Packet::~Packet() {
@@ -76,14 +78,21 @@ int Client::connect2server() {
 	return 0;
 }
 
-int Client::sendData(std::string_view data) {
+int Client::sendData() {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
-	bytesSent = send(connectSocket, data.data(), data.size(), 0);
+	std::string req;
+
+	cout << "Type what you want to send to server: " << endl << '>';
+	std::getline(std::cin, req);
+
+	auto packet = std::make_unique<Packet>((char*)req.c_str(), req.size());
+
+	int bytesSent = send(connectSocket, packet->data, packet->size, 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
-	cout << "Bytes sent: " << bytesSent << ", data: " << data << endl;
+	sendedPackets.push_back(std::move(packet));
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -103,9 +112,7 @@ int Client::receiveData() {
 		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
 			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
 
-			std::string_view resp = "Some data from the client, please check it";
-
-			if (sendData(resp)) cout << "SEND - error: " << WSAGetLastError() << endl;
+			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
 
 			counter++;
 		}
