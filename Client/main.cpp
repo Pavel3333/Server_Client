@@ -2,7 +2,7 @@
 
 #include "Client.h"
 
-constexpr uint16_t    DEFAULT_PORT = 27015;
+constexpr uint16_t    DEFAULT_PORT = 27010;
 constexpr const char* SERVER_IP    = "127.0.0.1";
 
 
