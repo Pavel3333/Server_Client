@@ -14,8 +14,18 @@ enum class CLIENT_STATE : uint8_t {
 
 class Client {
 public:
-	Client(PCSTR, USHORT);
+	Client(SOCKET, PCSTR, USHORT);
 	~Client();
+
+	std::vector<std::unique_ptr<Packet>> receivedPackets;
+	std::vector<std::unique_ptr<Packet>> sendedPackets;
+
+	int connect2client();
+	int sendData();
+	int receiveData();
+	int disconnect();
+private:
+	void setState(CLIENT_STATE state);
 
 	int error_code;
 
@@ -25,21 +35,9 @@ public:
 
 	uint16_t port;
 
-	int bytesSent;
-
-	std::vector<std::unique_ptr<Packet>> receivedPackets;
-	std::vector<std::unique_ptr<Packet>> sendedPackets;
-
-	int connect2server();
-	int sendData();
-	int receiveData();
-	int disconnect();
-private:
-	void setState(CLIENT_STATE state);
-
 	WSADATA wsaData;
 
-	SOCKET connectSocket;
+	SOCKET clientSocket;
 
 	struct sockaddr_in socketDesc;
 };

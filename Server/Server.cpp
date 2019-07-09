@@ -13,18 +13,6 @@ Server::~Server()
 {
 	if (state > SERVER_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
-	if (state != SERVER_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
-	else if (!receivedPackets.empty()) {
-#ifdef _DEBUG
-		cout << "All received data:" << endl;
-		size_t i = 1;
-
-		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
-#endif
-		
-		receivedPackets.clear();
-	}
-
 	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
 
 	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
@@ -82,18 +70,16 @@ int Server::startServer()
 	return 0;
 }
 
-
 int Server::closeServer()
 {
 	// Shutdown the connection since no more data will be sent
 	setState(SERVER_STATE::SHUTDOWN);
 
-	if (shutdown(clientSocket, SD_SEND) == SOCKET_ERROR) return 1;
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return 1;
 
 	// Close the socket
 	setState(SERVER_STATE::CLOSE_SOCKET);
 
-	if (closesocket(clientSocket)  == SOCKET_ERROR) return 1;
 	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
 
 	WSACleanup();
@@ -105,77 +91,43 @@ int Server::closeServer()
 }
 
 
-int Server::sendData() {
-	// Send an initial buffer
-	setState(SERVER_STATE::SEND);
-
-	std::string req;
-
-	cout << "Type what you want to send to client: " << endl << '>';
-	std::getline(std::cin, req);
-
-	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
-
-	int bytesSent = send(clientSocket, packet->data, packet->size, 0);
-	if (bytesSent == SOCKET_ERROR) return 1;
-
-	sendedPackets.push_back(std::move(packet));
-
-	setState(SERVER_STATE::OK);
-	return 0;
-}
-
-int Server::receiveData(SOCKET clientSocket) {
-	// Receive until the peer closes the connection
-	setState(SERVER_STATE::RECEIVE);
-
-	char respBuff[NET_BUFFER_SIZE];
-	int respSize;
-
-	do {
-		respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
-		if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_unique<Packet>(respBuff, respSize));
-
-			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
-		}
-		else if (respSize == 0) cout << "Connection closed" << endl;
-		else
-			return 1;
-	}
-	while (respSize > 0);
-
-	setState(state);
-	return 0;
-}
-
 int Server::handleRequests()
 {
 	sockaddr_in client;
 	int clientlen = sizeof(client);
 
-	while (true) {
+	while (clients.size() < 10) {
 		cout << "Wait for client..." << endl;
 
-		clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
+		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
 		if (clientSocket == INVALID_SOCKET) continue;
 
-		char host[NI_MAXHOST];
-		char service[NI_MAXSERV];
+		setState(SERVER_STATE::CONNECT); // Connected to client
 
-		ZeroMemory(host, NI_MAXHOST);
-		ZeroMemory(service, NI_MAXSERV);
 
-		if (int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0)) {
-			inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-			cout << host << " connected on port " << ntohs(client.sin_port) << endl;
-		}
-		else cout << host << " connected on port " << service << endl;
+		char client_IP [16]         = "-";
+		char host      [NI_MAXHOST] = "-";
+		char service   [NI_MAXSERV] = "-";
 
-		// Connecting to client
-		setState(SERVER_STATE::CONNECT);
+		uint16_t client_port = ntohs(client.sin_port);
 
-		if (receiveData(clientSocket)) cout << "RECEIVE - error: " << WSAGetLastError() << endl;
+		inet_ntop(AF_INET, &client.sin_addr, client_IP, 16); //get IP addr string
+
+		int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0);
+
+
+		cout << "Client (IP: " << client_IP << ", host: " << host << ") connected on port ";
+
+		if (err) cout << client_port;
+		else     cout << service;
+
+		cout << endl;
+
+
+		clients.push_back(std::make_unique<Client>(clientSocket, client_IP, client_port));
+
+
+		//if (receiveData(clientSocket)) cout << "RECEIVE - error: " << WSAGetLastError() << endl;
 
 		Sleep(100);
 	}

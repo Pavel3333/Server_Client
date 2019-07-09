@@ -2,10 +2,11 @@
 
 #include "Client.h"
 
-Client::Client(PCSTR IP, USHORT port)
-	: connectSocket(INVALID_SOCKET)
-	, port(port)
+Client::Client(SOCKET readSocket, PCSTR IP, USHORT port)
+	: readSocket(readSocket)
+	, writeSocket(INVALID_SOCKET)
 	, IP(IP)
+	, port(port)
 {
 	setState(CLIENT_STATE::OK);
 }
@@ -27,18 +28,21 @@ Client::~Client() {
 		receivedPackets.clear();
 	}
 
-	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(connectSocket);
+	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(readSocket);
 
 	WSACleanup();
 }
 
 
-int Client::connect2server() {
-	// Create a SOCKET for connecting to server (TCP/IP protocol)
+int Client::connect2client() {
+	// Create a SOCKET for connecting to client (TCP/IP protocol)
 	setState(CLIENT_STATE::CREATE_SOCKET);
 
-	connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (connectSocket == INVALID_SOCKET) return 1;
+	readSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (readSocket == INVALID_SOCKET) return 1;
+
+	writeSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (writeSocket == INVALID_SOCKET) return 2;
 
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port of the server to be connected to.
@@ -50,7 +54,7 @@ int Client::connect2server() {
 	// Connect to server.
 	setState(CLIENT_STATE::CONNECT);
 
-	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
+	if (connect(readSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
 
 	char addr_str[16];
 
@@ -67,12 +71,12 @@ int Client::sendData() {
 
 	std::string req;
 
-	cout << "Type what you want to send to server: " << endl << '>';
+	cout << "Type what you want to send to client: " << endl << '>';
 	std::getline(std::cin, req);
 
-	auto packet = std::make_unique<Packet>((char*)req.c_str(), req.size());
+	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
 
-	int bytesSent = send(connectSocket, packet->data, packet->size, 0);
+	int bytesSent = send(writeSocket, packet->data, packet->size, 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
 	sendedPackets.push_back(std::move(packet));
@@ -85,24 +89,20 @@ int Client::receiveData() {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
-	char recBuff[NET_BUFFER_SIZE];
-
-	int bytesRec;
-	size_t counter = 0;
+	char respBuff[NET_BUFFER_SIZE];
+	int respSize;
 
 	do {
-		bytesRec = recv(connectSocket, recBuff, NET_BUFFER_SIZE, 0);
-		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
+		respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
+		if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+			receivedPackets.push_back(std::make_unique<Packet>(respBuff, respSize));
 
 			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
-
-			counter++;
 		}
-		else if (bytesRec == 0) cout << "Connection closed" << endl;
+		else if (respSize == 0) cout << "Connection closed" << endl;
 		else
 			return 1;
-	} while (bytesRec > 0 && counter < 30);
+	} while (respSize > 0);
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -112,14 +112,14 @@ int Client::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return 1;
+	if (shutdown(readSocket, SD_RECEIVE) == SOCKET_ERROR) return 1;
+	if (shutdown(readSocket, SD_SEND)    == SOCKET_ERROR) return 2;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
-
-	WSACleanup();
+	if (closesocket(readSocket)  == SOCKET_ERROR) return 1;
+	if (closesocket(writeSocket) == SOCKET_ERROR) return 2;
 
 	cout << "The client was stopped" << endl;
 

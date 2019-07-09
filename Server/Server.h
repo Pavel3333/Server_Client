@@ -2,6 +2,8 @@
 
 #include "Common.h"
 
+#include "Client.h"
+
 enum class SERVER_STATE {
 	OK = 0,
 	INIT_WINSOCK,
@@ -21,9 +23,9 @@ public:
 	Server(USHORT port);
 	~Server();
 
+	std::vector<std::unique_ptr<Client>> clients;
+
 	int startServer();
-	int sendData();
-	int receiveData(SOCKET clientSocket);
 	int closeServer();
 	int handleRequests();
 private:
@@ -33,18 +35,13 @@ private:
 
 	uint16_t port;
 
-	int bytesSent;
 	int error_code;
-
-	std::vector<std::unique_ptr<Packet>> receivedPackets;
-	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
 	char port_str[7];
 
 	WSADATA wsData;
 
 	SOCKET connectSocket;
-	SOCKET clientSocket;
 
 	struct addrinfo* socketDesc;
 };
