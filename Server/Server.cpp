@@ -96,6 +96,8 @@ int Server::handleRequests()
 	sockaddr_in client;
 	int clientlen = sizeof(client);
 
+	// 10 clients limit
+
 	while (clients.size() < 10) {
 		cout << "Wait for client..." << endl;
 
@@ -104,6 +106,7 @@ int Server::handleRequests()
 
 		setState(SERVER_STATE::CONNECT); // Connected to client
 
+		// Collecting data about client IP, port and extra data (host, service)
 
 		char client_IP [16]         = "-";
 		char host      [NI_MAXHOST] = "-";
@@ -123,14 +126,14 @@ int Server::handleRequests()
 
 		cout << endl;
 
+		// Add the client into the clients vector
 
 		clients.push_back(std::make_unique<Client>(clientSocket, client_IP, client_port));
 
-
-		//if (receiveData(clientSocket)) cout << "RECEIVE - error: " << WSAGetLastError() << endl;
-
-		Sleep(100);
+		Sleep(1000);
 	}
+
+	cout << "Client connections count limit exceeded" << endl;
 
 	setState(SERVER_STATE::OK);
 	return 0;

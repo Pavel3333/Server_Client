@@ -2,9 +2,8 @@
 
 #include "Client.h"
 
-Client::Client(SOCKET readSocket, PCSTR IP, USHORT port)
-	: readSocket(readSocket)
-	, writeSocket(INVALID_SOCKET)
+Client::Client(SOCKET clientSocket, PCSTR IP, USHORT port)
+	: clientSocket(clientSocket)
 	, IP(IP)
 	, port(port)
 {
@@ -28,7 +27,7 @@ Client::~Client() {
 		receivedPackets.clear();
 	}
 
-	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(readSocket);
+	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(clientSocket);
 
 	WSACleanup();
 }
@@ -38,11 +37,8 @@ int Client::connect2client() {
 	// Create a SOCKET for connecting to client (TCP/IP protocol)
 	setState(CLIENT_STATE::CREATE_SOCKET);
 
-	readSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (readSocket == INVALID_SOCKET) return 1;
-
-	writeSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (writeSocket == INVALID_SOCKET) return 2;
+	clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (clientSocket == INVALID_SOCKET) return 1;
 
 	// The sockaddr_in structure specifies the address family,
 	// IP address, and port of the server to be connected to.
@@ -54,7 +50,7 @@ int Client::connect2client() {
 	// Connect to server.
 	setState(CLIENT_STATE::CONNECT);
 
-	if (connect(readSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
+	if (connect(clientSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
 
 	char addr_str[16];
 
@@ -76,7 +72,7 @@ int Client::sendData() {
 
 	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
 
-	int bytesSent = send(writeSocket, packet->data, packet->size, 0);
+	int bytesSent = send(clientSocket, packet->data, packet->size, 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
 	sendedPackets.push_back(std::move(packet));
@@ -93,7 +89,7 @@ int Client::receiveData() {
 	int respSize;
 
 	do {
-		respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
+		respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
 		if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
 			receivedPackets.push_back(std::make_unique<Packet>(respBuff, respSize));
 
@@ -112,14 +108,12 @@ int Client::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(readSocket, SD_RECEIVE) == SOCKET_ERROR) return 1;
-	if (shutdown(readSocket, SD_SEND)    == SOCKET_ERROR) return 2;
+	if (shutdown(clientSocket, SD_BOTH) == SOCKET_ERROR) return 1;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) return 1;
-	if (closesocket(writeSocket) == SOCKET_ERROR) return 2;
+	if (closesocket(clientSocket) == SOCKET_ERROR) return 1;
 
 	cout << "The client was stopped" << endl;
 

@@ -2,6 +2,8 @@
 
 #include "Common.h"
 
+#include <queue>
+
 enum class CLIENT_STATE : uint8_t {
 	OK = 0,
 	CREATE_SOCKET,
@@ -19,6 +21,8 @@ public:
 
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 	std::vector<std::unique_ptr<Packet>> sendedPackets;
+
+	std::queue<std::unique_ptr<Packet>> packetsToSend;
 
 	int connect2client();
 	int sendData();
