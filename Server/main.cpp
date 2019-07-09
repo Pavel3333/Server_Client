@@ -1,5 +1,7 @@
 #include "pch.h"
+
 #include "Server.h"
+#include "Client.h"
 
 constexpr uint16_t DEFAULT_PORT = 27010;
 

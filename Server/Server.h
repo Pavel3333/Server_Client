@@ -1,8 +1,6 @@
 #pragma once
-#include <vector>
 
-constexpr uint16_t NET_BUFFER_SIZE = 8192;
-
+#include "Common.h"
 
 enum class SERVER_STATE {
 	OK = 0,
@@ -16,13 +14,6 @@ enum class SERVER_STATE {
 	SEND,
 	SHUTDOWN,
 	CLOSE_SOCKET
-};
-
-struct Packet {
-	Packet(const char* data, size_t size = 0);
-	~Packet();
-	char* data;
-	size_t size;
 };
 
 class Server {

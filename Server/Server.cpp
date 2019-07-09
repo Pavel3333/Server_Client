@@ -1,26 +1,6 @@
 #include "pch.h"
-#include <string>
+
 #include "Server.h"
-
-Packet::Packet(const char* data, size_t size) {
-	if (!size) size = strnlen_s(data, NET_BUFFER_SIZE);
-
-	this->size = size;
-
-	this->data = new char[size + 2];
-	memcpy(this->data, data, size);
-	this->data[size] = NULL; //NULL-terminator
-
-#ifdef _DEBUG
-	cout << "Packet: " << size << ", data: ";
-#endif
-
-	cout << this->data << endl;
-}
-
-Packet::~Packet() {
-	delete this->data;
-}
 
 Server::Server(USHORT port)
     : connectSocket(INVALID_SOCKET)
@@ -28,7 +8,6 @@ Server::Server(USHORT port)
 {
 	setState(SERVER_STATE::OK);
 }
-
 
 Server::~Server()
 {
@@ -169,7 +148,6 @@ int Server::receiveData(SOCKET clientSocket) {
 	setState(state);
 	return 0;
 }
-
 
 int Server::handleRequests()
 {
