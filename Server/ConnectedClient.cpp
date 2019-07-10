@@ -38,7 +38,24 @@ int ConnectedClient::createThread() { // Handler thread creating
 }
 
 int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка пакета из очереди
+	if (sendData(std::move(packet))) return 1;
 
+	// Добавка в вектор всех отправленных пакетов
+	sendedPackets.push_back(std::move(packet));
+
+	if (packet->needConfirm) {
+		Packet resp;
+
+		if (receiveData(&resp)) return 2;
+
+		// Добавка в вектор всех пришедших пакетов
+		receivedPackets.push_back(std::make_unique<Packet>(resp));
+
+		// Обработка пришедшего пакета
+		cout << "Data received: " << resp.data << endl;
+	}
+
+	return 0;
 }
 
 void ConnectedClient::handlerThread() { // Поток обработки пакетов
@@ -72,16 +89,18 @@ void ConnectedClient::handlerThread() { // Поток обработки пакетов
 	cout << "Closing handler thread " << handler.get_id() << endl;
 }
 
-int ConnectedClient::sendData() {
+int ConnectedClient::sendData(std::unique_ptr<Packet> packet) {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
-	std::string req;
+	if (!packet->data) { //Ввести данные
+		std::string req;
 
-	cout << "Type what you want to send to client: " << endl << '>';
-	std::getline(std::cin, req);
+		cout << "Type what you want to send to client: " << endl << '>';
+		std::getline(std::cin, req);
 
-	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
+		packet = std::make_unique<Packet>(req.c_str(), req.size());
+	}
 
 	if (send(clientSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
 
@@ -91,25 +110,22 @@ int ConnectedClient::sendData() {
 	return 0;
 }
 
-int ConnectedClient::receiveData() {
+int ConnectedClient::receiveData(Packet* dest) {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
 	char respBuff[NET_BUFFER_SIZE];
-	int respSize;
 
-	do {
-		respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
-		if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_unique<Packet>(respBuff, respSize));
+	int respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
 
-			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
-		}
-		else if (respSize == 0) cout << "Connection closed" << endl;
-		else
-			return 1;
+	if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+		*dest = Packet(respBuff, respSize);
 	}
-	while (respSize > 0);
+	else if (!respSize) {
+		cout << "Connection closed" << endl;
+		return 2;
+	}
+	else return 1;
 
 	setState(CLIENT_STATE::OK);
 	return 0;

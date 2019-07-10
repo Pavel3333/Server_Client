@@ -27,8 +27,8 @@ public:
 	std::vector<std::unique_ptr<Packet>> syncPackets;
 
 	int createThread();
-	int sendData();
-	int receiveData();
+	int sendData(std::unique_ptr<Packet> packet);
+	int receiveData(Packet* dest);
 	int disconnect();
 private:
 	int  handlePacket(std::unique_ptr<Packet> packet);

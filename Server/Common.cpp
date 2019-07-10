@@ -14,10 +14,8 @@ Packet::Packet(const char* data, size_t size, bool needConfirm)
 	this->data[size] = NULL; //NULL-terminator
 
 #ifdef _DEBUG
-	cout << "Packet: " << size << ", data: ";
+	cout << "Packet: " << size << ", data: " << this->data << endl;;
 #endif
-
-	cout << this->data << endl;
 }
 
 Packet::~Packet() {
