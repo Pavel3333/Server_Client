@@ -12,10 +12,10 @@ enum class CLIENT_STATE : uint8_t {
 	CLOSE_SOCKET
 };
 
-class Client {
+class ConnectedClient {
 public:
-	Client(SOCKET, PCSTR, USHORT);
-	~Client();
+	ConnectedClient(SOCKET, PCSTR, USHORT);
+	~ConnectedClient();
 
 	int error_code;
 

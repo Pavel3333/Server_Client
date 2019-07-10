@@ -2,7 +2,7 @@
 
 #include "Common.h"
 
-#include "Client.h"
+#include "ConnectedClient.h"
 
 enum class SERVER_STATE {
 	OK = 0,
@@ -23,7 +23,7 @@ public:
 
 	int error_code;
 
-	std::vector<std::unique_ptr<Client>> clients;
+	std::vector<std::unique_ptr<ConnectedClient>> clientPool;
 
 	int startServer();
 	int closeServer();

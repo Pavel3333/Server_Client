@@ -103,7 +103,7 @@ int Server::handleRequests() //TODO: вынести в поток
 
 	// 10 clients limit
 
-	while (clients.size() < 10) {
+	while (clientPool.size() < 10) {
 		cout << "Wait for client..." << endl;
 
 		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
@@ -133,7 +133,7 @@ int Server::handleRequests() //TODO: вынести в поток
 
 		// Add the client into the clients vector
 
-		clients.push_back(std::make_unique<Client>(clientSocket, client_IP, client_port));
+		clientPool.push_back(std::make_unique<ConnectedClient>(clientSocket, client_IP, client_port));
 
 		Sleep(1000);
 	}

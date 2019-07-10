@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "Client.h"
+#include "ConnectedClient.h"
 
-Client::Client(SOCKET clientSocket, PCSTR IP, USHORT port)
+ConnectedClient::ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port)
 	: clientSocket(clientSocket)
 	, IP(IP)
 	, port(port)
@@ -13,7 +13,7 @@ Client::Client(SOCKET clientSocket, PCSTR IP, USHORT port)
 	// TODO: поток для клиента
 }
 
-Client::~Client() {
+ConnectedClient::~ConnectedClient() {
 	if(client_started) disconnect();
 
 	error_code = WSAGetLastError();
@@ -33,7 +33,7 @@ Client::~Client() {
 	}
 }
 
-int Client::sendData() {
+int ConnectedClient::sendData() {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
@@ -52,7 +52,7 @@ int Client::sendData() {
 	return 0;
 }
 
-int Client::receiveData() {
+int ConnectedClient::receiveData() {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
@@ -76,7 +76,7 @@ int Client::receiveData() {
 	return 0;
 }
 
-int Client::disconnect() {
+int ConnectedClient::disconnect() {
 	if (!client_started) return 0;
 
 	// Shutdown the connection since no more data will be sent
@@ -97,7 +97,7 @@ int Client::disconnect() {
 	return 0;
 }
 
-void Client::setState(CLIENT_STATE state)
+void ConnectedClient::setState(CLIENT_STATE state)
 {
 #ifdef _DEBUG
 	const char state_desc[32];
