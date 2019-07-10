@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Client", "Client\Client.vcxproj", "{732FD8D0-7A01-4553-8F61-F35AFF175765}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ServerAsio", "ServerAsio\ServerAsio.vcxproj", "{30C0C446-80B5-4E0B-A659-71333A434ED6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{732FD8D0-7A01-4553-8F61-F35AFF175765}.Release|x64.Build.0 = Release|x64
 		{732FD8D0-7A01-4553-8F61-F35AFF175765}.Release|x86.ActiveCfg = Release|Win32
 		{732FD8D0-7A01-4553-8F61-F35AFF175765}.Release|x86.Build.0 = Release|Win32
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Debug|x64.ActiveCfg = Debug|x64
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Debug|x64.Build.0 = Debug|x64
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Debug|x86.ActiveCfg = Debug|Win32
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Debug|x86.Build.0 = Debug|Win32
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Release|x64.ActiveCfg = Release|x64
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Release|x64.Build.0 = Release|x64
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Release|x86.ActiveCfg = Release|Win32
+		{30C0C446-80B5-4E0B-A659-71333A434ED6}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
