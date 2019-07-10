@@ -12,8 +12,6 @@ enum class SERVER_STATE {
 	BIND,
 	LISTEN,
 	CONNECT,
-	RECEIVE,
-	SEND,
 	SHUTDOWN,
 	CLOSE_SOCKET
 };
@@ -22,6 +20,8 @@ class Server {
 public:
 	Server(USHORT port);
 	~Server();
+
+	int error_code;
 
 	std::vector<std::unique_ptr<Client>> clients;
 
@@ -35,7 +35,7 @@ private:
 
 	uint16_t port;
 
-	int error_code;
+	bool server_started;
 
 	char port_str[7];
 

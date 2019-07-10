@@ -5,18 +5,20 @@
 Server::Server(USHORT port)
     : connectSocket(INVALID_SOCKET)
 	, port(port)
+	, server_started(false)
 {
 	setState(SERVER_STATE::OK);
 }
 
 Server::~Server()
 {
+	if (server_started) closeServer();
+
 	if (state > SERVER_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
-	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
+	if (state != SERVER_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
 
-	if (state > SERVER_STATE::CREATE_SOCKET) closesocket(connectSocket);
-	if (state > SERVER_STATE::INIT_WINSOCK)  WSACleanup();
+	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
 }
 
 
@@ -25,8 +27,7 @@ int Server::startServer()
 	// Initialize Winsock
 	setState(SERVER_STATE::INIT_WINSOCK);
 
-	int err = WSAStartup(MAKEWORD(2, 2), &wsData);
-	if (err) {
+	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsData)) {
 		return 1;
 	}
 
@@ -47,8 +48,7 @@ int Server::startServer()
 	hint.sin_port = htons(port);
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	err = bind(connectSocket, (sockaddr*)&hint, sizeof(hint));
-	if (err == SOCKET_ERROR) {
+	if (error_code = bind(connectSocket, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR) {
 		closesocket(connectSocket);
 		return 3;
 	}
@@ -56,8 +56,7 @@ int Server::startServer()
 	// Listening the port
 	setState(SERVER_STATE::LISTEN);
 
-	err = listen(connectSocket, SOMAXCONN);
-	if (err == SOCKET_ERROR) {
+	if (error_code = listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) {
 		closesocket(connectSocket);
 		return 1;
 	}
@@ -66,12 +65,16 @@ int Server::startServer()
 
 	cout << "The server is running" << endl;
 
+	server_started = true;
+
 	setState(SERVER_STATE::OK);
 	return 0;
 }
 
 int Server::closeServer()
 {
+	if (!server_started) return 0;
+
 	// Shutdown the connection since no more data will be sent
 	setState(SERVER_STATE::SHUTDOWN);
 
@@ -86,12 +89,14 @@ int Server::closeServer()
 
 	cout << "The server was stopped" << endl;
 
+	server_started = false;
+
 	setState(SERVER_STATE::OK);
 	return 0;
 }
 
 
-int Server::handleRequests()
+int Server::handleRequests() //TODO: вынести в поток
 {
 	sockaddr_in client;
 	int clientlen = sizeof(client);
@@ -143,8 +148,10 @@ int Server::handleRequests()
 void Server::setState(SERVER_STATE state)
 {
 #ifdef _DEBUG
+	const char state_desc[32];
+
 #define PRINT_STATE(X) case SERVER_STATE:: X: \
-	std::cout << "state changed to: " #X << std::endl; \
+	state_desc = #X; \
 	break;
 
 	switch (state) {
@@ -155,13 +162,15 @@ void Server::setState(SERVER_STATE state)
 		PRINT_STATE(BIND);
 		PRINT_STATE(LISTEN);
 		PRINT_STATE(CONNECT);
-		PRINT_STATE(RECEIVE);
-		PRINT_STATE(SEND);
 		PRINT_STATE(SHUTDOWN);
+		PRINT_STATE(CLOSE_SOCKET);
 	default:
-		std::cout << "unknown state: " << (int)state << std::endl;
+		std::cout << "Unknown state: " << (int)state << std::endl;
+		return;
 	}
 #undef PRINT_STATE
+
+	std::cout << "State changed to: " << state_desc << std::endl;
 #endif
 
 	this->state = state;

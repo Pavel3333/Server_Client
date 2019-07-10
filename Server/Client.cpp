@@ -6,11 +6,16 @@ Client::Client(SOCKET clientSocket, PCSTR IP, USHORT port)
 	: clientSocket(clientSocket)
 	, IP(IP)
 	, port(port)
+	, client_started(true)
 {
 	setState(CLIENT_STATE::OK);
+
+	// TODO: поток для клиента
 }
 
 Client::~Client() {
+	if(client_started) disconnect();
+
 	error_code = WSAGetLastError();
 
 	// Вывод сообщения об ошибке
@@ -26,39 +31,6 @@ Client::~Client() {
 
 		receivedPackets.clear();
 	}
-
-	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(clientSocket);
-
-	WSACleanup();
-}
-
-
-int Client::connect2client() {
-	// Create a SOCKET for connecting to client (TCP/IP protocol)
-	setState(CLIENT_STATE::CREATE_SOCKET);
-
-	clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (clientSocket == INVALID_SOCKET) return 1;
-
-	// The sockaddr_in structure specifies the address family,
-	// IP address, and port of the server to be connected to.
-
-	socketDesc.sin_family = AF_INET;
-	socketDesc.sin_port = htons(port);
-	inet_pton(AF_INET, IP, &socketDesc.sin_addr.s_addr);
-
-	// Connect to server.
-	setState(CLIENT_STATE::CONNECT);
-
-	if (connect(clientSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
-
-	char addr_str[16];
-
-	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) cout << "Cannot to get addr string of server IP" << endl;
-	else                                                           cout << "The client was connected to the server " << addr_str << ':' << ntohs(socketDesc.sin_port) << endl;
-
-	setState(CLIENT_STATE::OK);
-	return 0;
 }
 
 int Client::sendData() {
@@ -72,8 +44,7 @@ int Client::sendData() {
 
 	auto packet = std::make_unique<Packet>(req.c_str(), req.size());
 
-	int bytesSent = send(clientSocket, packet->data, packet->size, 0);
-	if (bytesSent == SOCKET_ERROR) return 1;
+	if (send(clientSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
 
 	sendedPackets.push_back(std::move(packet));
 
@@ -98,13 +69,16 @@ int Client::receiveData() {
 		else if (respSize == 0) cout << "Connection closed" << endl;
 		else
 			return 1;
-	} while (respSize > 0);
+	}
+	while (respSize > 0);
 
 	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
 int Client::disconnect() {
+	if (!client_started) return 0;
+
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
@@ -117,6 +91,8 @@ int Client::disconnect() {
 
 	cout << "The client was stopped" << endl;
 
+	client_started = false;
+
 	setState(CLIENT_STATE::OK);
 	return 0;
 }
@@ -124,24 +100,25 @@ int Client::disconnect() {
 void Client::setState(CLIENT_STATE state)
 {
 #ifdef _DEBUG
-#define PRINT_STATE(X) case CLIENT_STATE::X:           \
-	std::cout << "State changed to: " #X << std::endl; \
+	const char state_desc[32];
+
+#define PRINT_STATE(X) case SERVER_STATE:: X: \
+	state_desc = #X; \
 	break;
 
 	switch (state) {
 		PRINT_STATE(OK);
-		PRINT_STATE(INIT_WINSOCK);
-		PRINT_STATE(CREATE_SOCKET);
-		PRINT_STATE(CONNECT);
 		PRINT_STATE(SEND);
-		PRINT_STATE(SHUTDOWN);
 		PRINT_STATE(RECEIVE);
+		PRINT_STATE(SHUTDOWN);
 		PRINT_STATE(CLOSE_SOCKET);
 	default:
 		std::cout << "Unknown state: " << (int)state << std::endl;
 		return;
-	}
+}
 #undef PRINT_STATE
+
+	std::cout << "State changed to: " << state_desc << std::endl;
 #endif
 
 	this->state = state;

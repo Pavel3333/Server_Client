@@ -6,11 +6,9 @@
 
 enum class CLIENT_STATE : uint8_t {
 	OK = 0,
-	CREATE_SOCKET,
-	CONNECT,
 	SEND,
-	SHUTDOWN,
 	RECEIVE,
+	SHUTDOWN,
 	CLOSE_SOCKET
 };
 
@@ -19,25 +17,26 @@ public:
 	Client(SOCKET, PCSTR, USHORT);
 	~Client();
 
+	int error_code;
+
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
 	std::queue<std::unique_ptr<Packet>> packetsToSend;
 
-	int connect2client();
 	int sendData();
 	int receiveData();
 	int disconnect();
 private:
 	void setState(CLIENT_STATE state);
 
-	int error_code;
-
 	CLIENT_STATE state;
 
 	PCSTR IP;
 
 	uint16_t port;
+
+	bool client_started;
 
 	WSADATA wsaData;
 

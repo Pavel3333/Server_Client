@@ -22,15 +22,19 @@ Packet::~Packet() {
 	delete this->data;
 }
 
+
 Client::Client(PCSTR IP, USHORT port)
 	: connectSocket(INVALID_SOCKET)
 	, port(port)
 	, IP(IP)
+	, client_started(false)
 {
 	setState(CLIENT_STATE::OK);
 }
 
 Client::~Client() {
+	if (client_started) disconnect();
+
 	if (state > CLIENT_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
 	// Вывод сообщения об ошибке
@@ -46,9 +50,6 @@ Client::~Client() {
 
 		receivedPackets.clear();
 	}
-
-	if (state > CLIENT_STATE::CREATE_SOCKET) closesocket(connectSocket);
-	if (state > CLIENT_STATE::INIT_WINSOCK)  WSACleanup();
 }
 
 int Client::connect2server() {
@@ -79,6 +80,8 @@ int Client::connect2server() {
 
 	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) cout << "Cannot to get addr string of server IP" << endl;
 	else                                                           cout << "The client was connected to the server " << addr_str << ':' << ntohs(socketDesc.sin_port) << endl;
+
+	client_started = true;
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -133,6 +136,8 @@ int Client::receiveData() {
 }
 
 int Client::disconnect() {
+	if (!client_started) return 0;
+
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
@@ -146,6 +151,8 @@ int Client::disconnect() {
 	WSACleanup();
 
 	cout << "The client was stopped" << endl;
+
+	client_started = false;
 
 	setState(CLIENT_STATE::OK);
 	return 0;

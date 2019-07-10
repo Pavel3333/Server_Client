@@ -36,14 +36,6 @@ public:
 
 	int error_code;
 
-	CLIENT_STATE state;
-
-	PCSTR IP;
-
-	uint16_t port;
-
-	int bytesSent;
-
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
@@ -53,6 +45,14 @@ public:
 	int disconnect();
 private:
 	void setState(CLIENT_STATE state);
+
+	CLIENT_STATE state;
+
+	PCSTR IP;
+
+	uint16_t port;
+
+	bool client_started;
 
 	WSADATA wsaData;
 
