@@ -26,6 +26,7 @@ public:
 	std::queue<std::unique_ptr<Packet>> mainPackets;
 	std::vector<std::unique_ptr<Packet>> syncPackets;
 
+	int createThread();
 	int sendData();
 	int receiveData();
 	int disconnect();

@@ -9,11 +9,6 @@ ConnectedClient::ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port)
 	, client_started(true)
 {
 	setState(CLIENT_STATE::OK);
-
-	// Handler thread creating
-
-	handler = std::thread(handlerThread); // FIX ME
-	handler.detach();
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -36,6 +31,11 @@ ConnectedClient::~ConnectedClient() {
 	}
 }
 
+
+int ConnectedClient::createThread() { // Handler thread creating
+	handler = std::thread(&ConnectedClient::handlerThread, this);
+	handler.detach();
+}
 
 int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка пакета из очереди
 
