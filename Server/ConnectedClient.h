@@ -3,6 +3,7 @@
 #include "Common.h"
 
 #include <queue>
+#include <thread>
 
 enum class CLIENT_STATE : uint8_t {
 	OK = 0,
@@ -14,7 +15,7 @@ enum class CLIENT_STATE : uint8_t {
 
 class ConnectedClient {
 public:
-	ConnectedClient(SOCKET, PCSTR, USHORT);
+	ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port);
 	~ConnectedClient();
 
 	int error_code;
@@ -22,13 +23,19 @@ public:
 	std::vector<std::unique_ptr<Packet>> receivedPackets;
 	std::vector<std::unique_ptr<Packet>> sendedPackets;
 
-	std::queue<std::unique_ptr<Packet>> packetsToSend;
+	std::queue<std::unique_ptr<Packet>> mainPackets;
+	std::vector<std::unique_ptr<Packet>> syncPackets;
 
 	int sendData();
 	int receiveData();
 	int disconnect();
 private:
+	int  handlePacket(std::unique_ptr<Packet> packet);
+	void handlerThread();
+
 	void setState(CLIENT_STATE state);
+
+	std::thread handler;
 
 	CLIENT_STATE state;
 

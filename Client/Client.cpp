@@ -141,12 +141,12 @@ int Client::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return 1;
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
+	if (closesocket(connectSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
 
 	WSACleanup();
 

@@ -39,8 +39,6 @@ private:
 
 	char port_str[7];
 
-	WSADATA wsData;
-
 	SOCKET connectSocket;
 
 	struct addrinfo* socketDesc;

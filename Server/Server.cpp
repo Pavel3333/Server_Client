@@ -27,17 +27,15 @@ int Server::startServer()
 	// Initialize Winsock
 	setState(SERVER_STATE::INIT_WINSOCK);
 
-	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsData)) {
-		return 1;
-	}
+	WSADATA wsData;
+
+	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsData)) return 1;
 
 	// Create a SOCKET for connecting to clients (TCP/IP protocol)
 	setState(SERVER_STATE::CREATE_SOCKET);
 
 	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (connectSocket == INVALID_SOCKET) {
-		return 2;
-	}
+	if (connectSocket == INVALID_SOCKET) return 2;
 
 	// Bind the socket
 	setState(SERVER_STATE::BIND);
@@ -48,18 +46,12 @@ int Server::startServer()
 	hint.sin_port = htons(port);
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	if (error_code = bind(connectSocket, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR) {
-		closesocket(connectSocket);
-		return 3;
-	}
+	if (error_code = bind(connectSocket, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR) return 1;
 
 	// Listening the port
 	setState(SERVER_STATE::LISTEN);
 
-	if (error_code = listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) {
-		closesocket(connectSocket);
-		return 1;
-	}
+	if (error_code = listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) return 1;
 
 	freeaddrinfo(socketDesc);
 
@@ -78,12 +70,12 @@ int Server::closeServer()
 	// Shutdown the connection since no more data will be sent
 	setState(SERVER_STATE::SHUTDOWN);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) return 1;
+	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
 
 	// Close the socket
 	setState(SERVER_STATE::CLOSE_SOCKET);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) return 1;
+	if (closesocket(connectSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
 
 	WSACleanup();
 

@@ -10,7 +10,10 @@ ConnectedClient::ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port)
 {
 	setState(CLIENT_STATE::OK);
 
-	// TODO: поток для клиента
+	// Handler thread creating
+
+	handler = std::thread(handlerThread); // FIX ME
+	handler.detach();
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -31,6 +34,42 @@ ConnectedClient::~ConnectedClient() {
 
 		receivedPackets.clear();
 	}
+}
+
+
+int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка пакета из очереди
+
+}
+
+void ConnectedClient::handlerThread() { // Поток обработки пакетов
+	while (client_started) {
+		// Обработать основные пакеты
+		while (!mainPackets.empty()) {
+			std::unique_ptr<Packet> packet = std::move(mainPackets.back());
+
+			if (handlePacket(std::move(packet))) {
+				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
+				syncPackets.push_back(std::move(packet));
+			}
+			
+			mainPackets.pop();
+		}
+
+		// Обработать пакеты, не подтвержденные клиентами
+		auto packet = syncPackets.begin();
+		while (packet != syncPackets.end()) {
+			if (handlePacket(std::move(*packet))) {
+				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
+				packet++;
+			}
+			else packet = syncPackets.erase(packet);
+		}
+
+		Sleep(100);
+	};
+
+	// Закрываем поток
+	cout << "Closing handler thread " << handler.get_id() << endl;
 }
 
 int ConnectedClient::sendData() {
@@ -82,12 +121,12 @@ int ConnectedClient::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(clientSocket, SD_BOTH) == SOCKET_ERROR) return 1;
+	if (shutdown(clientSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(clientSocket) == SOCKET_ERROR) return 1;
+	if (closesocket(clientSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
 
 	cout << "The client was stopped" << endl;
 
