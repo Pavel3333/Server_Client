@@ -16,7 +16,7 @@ ConnectedClient::~ConnectedClient() {
 
 	error_code = WSAGetLastError();
 
-	// Вывод сообщения об ошибке
+	// Р’С‹РІРѕРґ СЃРѕРѕР±С‰РµРЅРёСЏ РѕР± РѕС€РёР±РєРµ
 
 	if (state != CLIENT_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
 	else if (!receivedPackets.empty()) {
@@ -37,10 +37,10 @@ int ConnectedClient::createThread() { // Handler thread creating
 	handler.detach();
 }
 
-int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка пакета из очереди
+int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // РћР±СЂР°Р±РѕС‚РєР° РїР°РєРµС‚Р° РёР· РѕС‡РµСЂРµРґРё
 	if (sendData(std::move(packet))) return 1;
 
-	// Добавка в вектор всех отправленных пакетов
+	// Р”РѕР±Р°РІРєР° РІ РІРµРєС‚РѕСЂ РІСЃРµС… РѕС‚РїСЂР°РІР»РµРЅРЅС‹С… РїР°РєРµС‚РѕРІ
 	sendedPackets.push_back(std::move(packet));
 
 	if (packet->needConfirm) {
@@ -48,35 +48,35 @@ int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка
 
 		if (receiveData(&resp)) return 2;
 
-		// Добавка в вектор всех пришедших пакетов
+		// Р”РѕР±Р°РІРєР° РІ РІРµРєС‚РѕСЂ РІСЃРµС… РїСЂРёС€РµРґС€РёС… РїР°РєРµС‚РѕРІ
 		receivedPackets.push_back(std::make_unique<Packet>(resp));
 
-		// Обработка пришедшего пакета
+		// РћР±СЂР°Р±РѕС‚РєР° РїСЂРёС€РµРґС€РµРіРѕ РїР°РєРµС‚Р°
 		cout << "Data received: " << resp.data << endl;
 	}
 
 	return 0;
 }
 
-void ConnectedClient::handlerThread() { // Поток обработки пакетов
+void ConnectedClient::handlerThread() { // РџРѕС‚РѕРє РѕР±СЂР°Р±РѕС‚РєРё РїР°РєРµС‚РѕРІ
 	while (client_started) {
-		// Обработать основные пакеты
+		// РћР±СЂР°Р±РѕС‚Р°С‚СЊ РѕСЃРЅРѕРІРЅС‹Рµ РїР°РєРµС‚С‹
 		while (!mainPackets.empty()) {
 			std::unique_ptr<Packet> packet = std::move(mainPackets.back());
 
 			if (handlePacket(std::move(packet))) {
-				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
+				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: РїРёСЃР°С‚СЊ Packet ID
 				syncPackets.push_back(std::move(packet));
 			}
 			
 			mainPackets.pop();
 		}
 
-		// Обработать пакеты, не подтвержденные клиентами
+		// РћР±СЂР°Р±РѕС‚Р°С‚СЊ РїР°РєРµС‚С‹, РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРЅС‹Рµ РєР»РёРµРЅС‚Р°РјРё
 		auto packet = syncPackets.begin();
 		while (packet != syncPackets.end()) {
 			if (handlePacket(std::move(*packet))) {
-				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
+				cout << "Packet not confirmed" << endl; // TODO: РїРёСЃР°С‚СЊ Packet ID
 				packet++;
 			}
 			else packet = syncPackets.erase(packet);
@@ -85,7 +85,7 @@ void ConnectedClient::handlerThread() { // Поток обработки пакетов
 		Sleep(100);
 	};
 
-	// Закрываем поток
+	// Р—Р°РєСЂС‹РІР°РµРј РїРѕС‚РѕРє
 	cout << "Closing handler thread " << handler.get_id() << endl;
 }
 
@@ -93,7 +93,7 @@ int ConnectedClient::sendData(std::unique_ptr<Packet> packet) {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
-	if (!packet->data) { //Ввести данные
+	if (!packet->data) { //Р’РІРµСЃС‚Рё РґР°РЅРЅС‹Рµ
 		std::string req;
 
 		cout << "Type what you want to send to client: " << endl << '>';
@@ -118,7 +118,7 @@ int ConnectedClient::receiveData(Packet* dest) {
 
 	int respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
 
-	if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
+	if (respSize > 0) { //Р—Р°РїРёСЃС‹РІР°РµРј РґР°РЅРЅС‹Рµ РѕС‚ РєР»РёРµРЅС‚Р° (TODO: РїРёСЃР°С‚СЊ С‚СѓРґР° Рё ID РєР»РёРµРЅС‚Р°)
 		*dest = Packet(respBuff, respSize);
 	}
 	else if (!respSize) {

@@ -22,7 +22,7 @@ int main()
 	else                   cout << "Server created successfully!" << endl;
 
 	int v;
-	std::cin >> v; //Чтобы не закрывалось окно
+	std::cin >> v; //Р§С‚РѕР±С‹ РЅРµ Р·Р°РєСЂС‹РІР°Р»РѕСЃСЊ РѕРєРЅРѕ
 
 	return 0;
 }

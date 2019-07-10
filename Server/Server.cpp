@@ -88,7 +88,7 @@ int Server::closeServer()
 }
 
 
-int Server::handleRequests() //TODO: вынести в поток
+int Server::handleRequests() //TODO: РІС‹РЅРµСЃС‚Рё РІ РїРѕС‚РѕРє
 {
 	sockaddr_in client;
 	int clientlen = sizeof(client);
