@@ -7,11 +7,10 @@ constexpr uint16_t DEFAULT_PORT = 27010;
 
 int start()
 {
-	auto server = make_shared<Server>(DEFAULT_PORT);
+	auto server = std::make_unique<Server>(DEFAULT_PORT);
 
 	if (server->startServer())    return 1;
-	if (server->handleRequests()) return 2;
-	if (server->closeServer())    return 3;
+	if (server->closeServer())    return 2;
 
 	return 0;
 }

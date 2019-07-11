@@ -34,7 +34,7 @@ int Server::startServer()
 	// Create a SOCKET for connecting to clients (TCP/IP protocol)
 	setState(SERVER_STATE::CREATE_SOCKET);
 
-	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
+	connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (connectSocket == INVALID_SOCKET) return 2;
 
 	// Bind the socket
@@ -54,6 +54,9 @@ int Server::startServer()
 	if (error_code = listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) return 1;
 
 	freeaddrinfo(socketDesc);
+
+	handler = std::thread(&Server::handleRequests, this);
+	handler.detach();
 
 	cout << "The server is running" << endl;
 
@@ -87,59 +90,76 @@ int Server::closeServer()
 	return 0;
 }
 
+int Server::handshake_1(ConnectedClientPtr client, SOCKET socket) { // Первое рукопожатие с соединенным клиентом
+	/*
+	Присвоить сокет на запись
+	*/
+	setState(SERVER_STATE::HANDSHAKE_1);
 
-int Server::handleRequests() //TODO: РІС‹РЅРµСЃС‚Рё РІ РїРѕС‚РѕРє
-{
-	sockaddr_in client;
-	int clientlen = sizeof(client);
-
-	// 10 clients limit
-
-	while (clientPool.size() < 10) {
-		cout << "Wait for client..." << endl;
-
-		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&client, &clientlen);
-		if (clientSocket == INVALID_SOCKET) continue;
-
-		setState(SERVER_STATE::CONNECT); // Connected to client
-
-		// Collecting data about client IP, port and extra data (host, service)
-
-		char client_IP [16]         = "-";
-		char host      [NI_MAXHOST] = "-";
-		char service   [NI_MAXSERV] = "-";
-
-		uint16_t client_port = ntohs(client.sin_port);
-
-		inet_ntop(AF_INET, &client.sin_addr, client_IP, 16); //get IP addr string
-
-		int err = getnameinfo((sockaddr*)&client, clientlen, host, NI_MAXHOST, service, NI_MAXSERV, 0);
-
-
-		cout << "Client (IP: " << client_IP << ", host: " << host << ") connected on port ";
-
-		if (err) cout << client_port;
-		else     cout << service;
-
-		cout << endl;
-
-		// Add the client into the clients vector
-
-		auto client = std::make_shared<ConnectedClient>(clientSocket, client_IP, client_port);
-
-		client->handshake();
-
-		clientPool.push_back(client);
-
-		Sleep(1000);
-	}
-
-	cout << "Client connections count limit exceeded" << endl;
+	client->writeSocket = socket;
 
 	setState(SERVER_STATE::OK);
 	return 0;
 }
 
+int Server::handshake_2(ConnectedClientPtr client, SOCKET socket) { // Второе рукопожатие с соединенным клиентом
+	/*
+	Присвоить сокет на чтение
+	Создать потоки-обработчики
+	Отправить пакет ACK, подтвердить получение
+	*/
+	setState(SERVER_STATE::HANDSHAKE_2);
+
+	client->readSocket = socket;
+	client->started    = true;
+	client->createThreads();
+
+	//TODO: Отправить пакет ACK, подтвердить получение
+
+	setState(SERVER_STATE::OK);
+	return 0;
+}
+
+void Server::handleRequests()
+{
+	sockaddr_in clientDesc;
+	int clientLen = sizeof(clientDesc);
+
+	// 10 clients limit
+
+	uint16_t clientID = 0;
+
+	while (clientPool.size() < 10) {
+		cout << "Wait for client..." << endl;
+
+		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&clientDesc, &clientLen);
+		if (clientSocket == INVALID_SOCKET) continue;
+
+		// Connected to client
+		setState(SERVER_STATE::CONNECT);
+
+		unsigned long IP = clientDesc.sin_addr.s_addr;
+
+		auto clientWithSameIP = std::find_if(clientPool.cbegin(), clientPool.cend(), [IP](ConnectedClientPtr p) { return p->clientDesc.sin_addr.s_addr == IP; });
+		
+		if (clientWithSameIP != clientPool.cend()) { // Уже есть клиент с таким же IP, продолжить рукопожатие
+			if (handshake_2(*clientWithSameIP, clientSocket)) cout << "Error while second handshaking. Client ID:" << (*clientWithSameIP)->ID << endl;
+		}
+		else {                                       // Такого клиента нет, добавить и начать рукопожатие
+			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
+
+			clientPool.push_back(client);
+
+			if(handshake_1(client, clientSocket)) cout << "Error while first handshaking. Client ID:" << client->ID << endl;
+		}
+
+		Sleep(500);
+	}
+
+	cout << "Client connections count limit exceeded" << endl;
+
+	setState(SERVER_STATE::OK);
+}
 
 void Server::setState(SERVER_STATE state)
 {

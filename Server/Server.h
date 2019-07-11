@@ -4,6 +4,8 @@
 
 #include "ConnectedClient.h"
 
+typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;
+
 enum class SERVER_STATE {
 	OK = 0,
 	INIT_WINSOCK,
@@ -12,6 +14,8 @@ enum class SERVER_STATE {
 	BIND,
 	LISTEN,
 	CONNECT,
+	HANDSHAKE_1,
+	HANDSHAKE_2,
 	SHUTDOWN,
 	CLOSE_SOCKET
 };
@@ -21,15 +25,20 @@ public:
 	Server(USHORT port);
 	~Server();
 
-	int error_code;
-
-	std::vector<std::shared_ptr<ConnectedClient>> clientPool;
+	std::vector<ConnectedClientPtr> clientPool;
 
 	int startServer();
 	int closeServer();
-	int handleRequests();
 private:
+	int handshake_1(ConnectedClientPtr client, SOCKET socket);
+	int handshake_2(ConnectedClientPtr client, SOCKET socket);
+
+	void handleRequests();
 	void setState(SERVER_STATE state);
+
+	std::thread handler;
+
+	int error_code;
 
 	SERVER_STATE state;
 

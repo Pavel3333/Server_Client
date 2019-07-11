@@ -17,10 +17,11 @@ enum class CLIENT_STATE : uint8_t {
 
 class ConnectedClient {
 public:
-	ConnectedClient(uint16_t ID, PCSTR IP, USHORT port);
+	ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int clientLen);
 	~ConnectedClient();
 
-	int error_code;
+	uint16_t ID;
+	bool started;
 
 	std::vector<PacketPtr> receivedPackets;
 	std::vector<PacketPtr> sendedPackets;
@@ -28,12 +29,17 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
-	int handshake();
+	void createThreads();
 
 	int receiveData(PacketPtr dest);
 	int sendData(PacketPtr packet);
 
 	int disconnect();
+
+	sockaddr_in clientDesc;
+
+	SOCKET readSocket;
+	SOCKET writeSocket;
 private:
 	int handlePacketIn(std::function<int(PacketPtr)>handler);
 	int handlePacketOut(PacketPtr packet);
@@ -46,19 +52,14 @@ private:
 	std::thread receiver;
 	std::thread sender;
 
+	int error_code;
+
 	CLIENT_STATE state;
 
-	PCSTR IP;
+	char IP_str[16];
+	char host[NI_MAXHOST];
+
+	unsigned long IP;
 
 	uint16_t port;
-	uint16_t ID;
-
-	bool client_started;
-
-	WSADATA wsaData;
-
-	SOCKET readSocket;
-	SOCKET writeSocket;
-
-	struct sockaddr_in socketDesc;
 };

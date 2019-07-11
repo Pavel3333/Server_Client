@@ -2,19 +2,26 @@
 
 #include "ConnectedClient.h"
 
-ConnectedClient::ConnectedClient(uint16_t ID, PCSTR IP, USHORT port)
+ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int clientLen)
 	: readSocket(INVALID_SOCKET)
 	, writeSocket(INVALID_SOCKET)
 	, ID(ID)
-	, IP(IP)
-	, port(port)
-	, client_started(true)
+	, IP(clientDesc.sin_addr.s_addr)
+	, port(ntohs(clientDesc.sin_port))
+	, started(false)
 {
+	// Collecting data about client IP, port and host
+
+	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
+	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
+
+	cout << "Client (IP: " << IP_str << ", host: " << host << ") connected on port " << port << endl;
+
 	setState(CLIENT_STATE::OK);
 }
 
 ConnectedClient::~ConnectedClient() {
-	if(client_started) disconnect();
+	if(started) disconnect();
 
 	error_code = WSAGetLastError();
 
@@ -33,8 +40,7 @@ ConnectedClient::~ConnectedClient() {
 	}
 }
 
-
-int ConnectedClient::handshake() { // TODO
+void ConnectedClient::createThreads() {
 	sender = std::thread(&ConnectedClient::senderThread, this);
 	sender.detach();
 
@@ -51,16 +57,14 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // �
 	receivedPackets.push_back(packet);
 
 	// Обработка пришедшего пакета
-	handler(packet);
-
-	return 0;
+	return handler(packet);
 }
 
 int handle1(PacketPtr packet) { // Обработка пакета ACK
 	cout << packet->data << endl;
 }
 
-int handle2(PacketPtr packet) {
+int handle2(PacketPtr packet) { // Обработка любого входящего пакета
 	cout << packet->data << endl;
 }
 
@@ -75,7 +79,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet) { // Обработка �
 }
 
 void ConnectedClient::receiverThread() { // Поток обработки входящих пакетов
-	while (client_started) {
+	while (started) {
 		if (int err = handlePacketIn(handle2)) {
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
@@ -87,7 +91,7 @@ void ConnectedClient::receiverThread() { // Поток обработки вхо
 }
 
 void ConnectedClient::senderThread() { // Поток отправки пакетов
-	while (client_started) {
+	while (started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
 			PacketPtr packet = mainPackets.back();
@@ -162,7 +166,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 }
 
 int ConnectedClient::disconnect() {
-	if (!client_started) return 0;
+	if (!started) return 0;
 
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
@@ -178,7 +182,7 @@ int ConnectedClient::disconnect() {
 
 	cout << "Connected client was stopped" << endl;
 
-	client_started = false;
+	started = false;
 
 	setState(CLIENT_STATE::OK);
 	return 0;

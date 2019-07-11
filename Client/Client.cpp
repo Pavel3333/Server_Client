@@ -61,7 +61,7 @@ int Client::connect2server() {
 	// Create a SOCKET for connecting to server (TCP/IP protocol)
 	setState(CLIENT_STATE::CREATE_SOCKET);
 
-	connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (connectSocket == INVALID_SOCKET) return 1;
 
 	// The sockaddr_in structure specifies the address family,
