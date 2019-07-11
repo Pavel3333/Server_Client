@@ -17,26 +17,26 @@ enum class CLIENT_STATE : uint8_t {
 
 class ConnectedClient {
 public:
-	ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port);
+	ConnectedClient(uint16_t ID, PCSTR IP, USHORT port);
 	~ConnectedClient();
 
 	int error_code;
 
-	std::vector<std::shared_ptr<Packet>> receivedPackets;
-	std::vector<std::shared_ptr<Packet>> sendedPackets;
+	std::vector<PacketPtr> receivedPackets;
+	std::vector<PacketPtr> sendedPackets;
 
-	std::queue<std::shared_ptr<Packet>> mainPackets;
-	std::vector<std::shared_ptr<Packet>> syncPackets;
+	std::queue<PacketPtr> mainPackets;
+	std::vector<PacketPtr> syncPackets;
 
-	int createThreads();
+	int handshake();
 
-	int receiveData(std::shared_ptr<Packet> dest);
-	int sendData(std::shared_ptr<Packet> packet);
+	int receiveData(PacketPtr dest);
+	int sendData(PacketPtr packet);
 
 	int disconnect();
 private:
-	int handlePacketIn(std::function<int(std::shared_ptr<Packet>)>handler);
-	int handlePacketOut(std::shared_ptr<Packet> packet);
+	int handlePacketIn(std::function<int(PacketPtr)>handler);
+	int handlePacketOut(PacketPtr packet);
 
 	void receiverThread();
 	void senderThread();
@@ -51,12 +51,14 @@ private:
 	PCSTR IP;
 
 	uint16_t port;
+	uint16_t ID;
 
 	bool client_started;
 
 	WSADATA wsaData;
 
-	SOCKET clientSocket;
+	SOCKET readSocket;
+	SOCKET writeSocket;
 
 	struct sockaddr_in socketDesc;
 };

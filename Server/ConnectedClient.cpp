@@ -2,8 +2,10 @@
 
 #include "ConnectedClient.h"
 
-ConnectedClient::ConnectedClient(SOCKET clientSocket, PCSTR IP, USHORT port)
-	: clientSocket(clientSocket)
+ConnectedClient::ConnectedClient(uint16_t ID, PCSTR IP, USHORT port)
+	: readSocket(INVALID_SOCKET)
+	, writeSocket(INVALID_SOCKET)
+	, ID(ID)
 	, IP(IP)
 	, port(port)
 	, client_started(true)
@@ -32,7 +34,7 @@ ConnectedClient::~ConnectedClient() {
 }
 
 
-int ConnectedClient::createThreads() { // Handler threads creating
+int ConnectedClient::handshake() { // TODO
 	sender = std::thread(&ConnectedClient::senderThread, this);
 	sender.detach();
 
@@ -40,10 +42,10 @@ int ConnectedClient::createThreads() { // Handler threads creating
 	receiver.detach();
 }
 
-int ConnectedClient::handlePacketIn(std::function<int(std::shared_ptr<Packet>)>handler) { // Обработка пакета из очереди
+int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // Обработка пакета из очереди
 	auto packet = std::make_shared<Packet>(); // TODO: сделать с этим что-нибудь
 
-	if (int err = receiveData(packet)) return err; // Критическая ошибка или соединение сброшено
+	if (int err = receiveData(packet)) return err; // Произошла ошибка
 
 	// Добавить пакет
 	receivedPackets.push_back(packet);
@@ -54,15 +56,15 @@ int ConnectedClient::handlePacketIn(std::function<int(std::shared_ptr<Packet>)>h
 	return 0;
 }
 
-int handle1(std::shared_ptr<Packet> packet) { // Обработка пакета ACK
+int handle1(PacketPtr packet) { // Обработка пакета ACK
 	cout << packet->data << endl;
 }
 
-int handle2(std::shared_ptr<Packet> packet) {
+int handle2(PacketPtr packet) {
 	cout << packet->data << endl;
 }
 
-int ConnectedClient::handlePacketOut(std::shared_ptr<Packet> packet) { // Обработка пакета из очереди
+int ConnectedClient::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
 	if (sendData(packet)) return 1;
 
 	if (packet->needACK) {
@@ -88,7 +90,7 @@ void ConnectedClient::senderThread() { // Поток отправки пакет
 	while (client_started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
-			std::shared_ptr<Packet> packet = mainPackets.back();
+			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
 				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
@@ -115,13 +117,13 @@ void ConnectedClient::senderThread() { // Поток отправки пакет
 	cout << "Closing sender thread " << sender.get_id() << endl;
 }
 
-int ConnectedClient::receiveData(std::shared_ptr<Packet> dest) {
+int ConnectedClient::receiveData(PacketPtr dest) {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
 	char respBuff[NET_BUFFER_SIZE];
 
-	int respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
+	int respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
 
 	if (respSize > 0) { //Записываем данные от клиента
 		dest->data = respBuff;
@@ -138,7 +140,7 @@ int ConnectedClient::receiveData(std::shared_ptr<Packet> dest) {
 	return 0;
 }
 
-int ConnectedClient::sendData(std::shared_ptr<Packet> packet) {
+int ConnectedClient::sendData(PacketPtr packet) {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
@@ -151,7 +153,7 @@ int ConnectedClient::sendData(std::shared_ptr<Packet> packet) {
 		packet = std::make_shared<Packet>(req.c_str(), req.size());
 	}*/
 
-	if (send(clientSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
+	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
 
 	sendedPackets.push_back(packet);
 
@@ -165,14 +167,16 @@ int ConnectedClient::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(clientSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(clientSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket" << endl;
+	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket" << endl;
 
-	cout << "The client was stopped" << endl;
+	cout << "Connected client was stopped" << endl;
 
 	client_started = false;
 

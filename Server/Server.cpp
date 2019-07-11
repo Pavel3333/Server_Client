@@ -127,7 +127,7 @@ int Server::handleRequests() //TODO: вынести в поток
 
 		auto client = std::make_shared<ConnectedClient>(clientSocket, client_IP, client_port);
 
-		client->createThreads();
+		client->handshake();
 
 		clientPool.push_back(client);
 

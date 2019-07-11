@@ -9,3 +9,5 @@ struct Packet {
 	size_t size;
 	bool needACK;
 };
+
+typedef std::shared_ptr<Packet> PacketPtr;
