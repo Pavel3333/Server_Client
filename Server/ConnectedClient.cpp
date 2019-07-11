@@ -90,7 +90,7 @@ void ConnectedClient::senderThread() { // Поток отправки пакет
 		while (!mainPackets.empty()) {
 			std::shared_ptr<Packet> packet = mainPackets.back();
 
-			if (handlePacket(packet)) {
+			if (handlePacketOut(packet)) {
 				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
 				syncPackets.push_back(packet);
 			}
@@ -101,7 +101,7 @@ void ConnectedClient::senderThread() { // Поток отправки пакет
 		// Обработать пакеты, не подтвержденные клиентами
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
-			if (handlePacket(*packetIt)) {
+			if (handlePacketOut(*packetIt)) {
 				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
 				packetIt++;
 			}
@@ -126,7 +126,7 @@ int ConnectedClient::receiveData(std::shared_ptr<Packet> dest) {
 	if (respSize > 0) { //Записываем данные от клиента
 		dest->data = respBuff;
 		dest->size = respSize;
-		dest->needConfirm = false;
+		dest->needACK = false;
 	}
 	else if (!respSize) {
 		cout << "Connection closed" << endl;
