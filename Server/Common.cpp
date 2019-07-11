@@ -19,5 +19,5 @@ Packet::Packet(const char* data, size_t size, bool needACK)
 }
 
 Packet::~Packet() {
-	delete this->data;
+	delete[] this->data;
 }

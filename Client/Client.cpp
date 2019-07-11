@@ -12,14 +12,12 @@ Packet::Packet(const char* data, size_t size) {
 	this->data[size] = NULL; //NULL-terminator
 
 #ifdef _DEBUG
-	cout << "Packet: " << size << ", data: ";
+	cout << "Packet: " << size << ", data: " << this->data << endl;
 #endif
-
-	cout << this->data << endl;
 }
 
 Packet::~Packet() {
-	delete this->data;
+	delete[] this->data;
 }
 
 
