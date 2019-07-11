@@ -125,11 +125,11 @@ int Server::handleRequests() //TODO: вынести в поток
 
 		// Add the client into the clients vector
 
-		auto client = std::make_unique<ConnectedClient>(clientSocket, client_IP, client_port);
+		auto client = std::make_shared<ConnectedClient>(clientSocket, client_IP, client_port);
 
-		client->createThread();
+		client->createThreads();
 
-		clientPool.push_back(std::move(client));
+		clientPool.push_back(client);
 
 		Sleep(1000);
 	}

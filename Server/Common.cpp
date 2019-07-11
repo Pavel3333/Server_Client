@@ -2,8 +2,8 @@
 
 #include "Common.h"
 
-Packet::Packet(const char* data, size_t size, bool needConfirm)
-	: needConfirm(needConfirm)
+Packet::Packet(const char* data, size_t size, bool needACK)
+	: needACK(needACK)
 {
 	if (!size) size = strnlen_s(data, NET_BUFFER_SIZE);
 

@@ -4,6 +4,8 @@
 
 #include <queue>
 #include <thread>
+#include <memory>
+#include <functional>
 
 enum class CLIENT_STATE : uint8_t {
 	OK = 0,
@@ -20,23 +22,29 @@ public:
 
 	int error_code;
 
-	std::vector<std::unique_ptr<Packet>> receivedPackets;
-	std::vector<std::unique_ptr<Packet>> sendedPackets;
+	std::vector<std::shared_ptr<Packet>> receivedPackets;
+	std::vector<std::shared_ptr<Packet>> sendedPackets;
 
-	std::queue<std::unique_ptr<Packet>> mainPackets;
-	std::vector<std::unique_ptr<Packet>> syncPackets;
+	std::queue<std::shared_ptr<Packet>> mainPackets;
+	std::vector<std::shared_ptr<Packet>> syncPackets;
 
-	int createThread();
-	int sendData(std::unique_ptr<Packet> packet);
-	int receiveData(Packet* dest);
+	int createThreads();
+
+	int receiveData(std::shared_ptr<Packet> dest);
+	int sendData(std::shared_ptr<Packet> packet);
+
 	int disconnect();
 private:
-	int  handlePacket(std::unique_ptr<Packet> packet);
-	void handlerThread();
+	int handlePacketIn(std::function<int(std::shared_ptr<Packet>)>handler);
+	int handlePacketOut(std::shared_ptr<Packet> packet);
+
+	void receiverThread();
+	void senderThread();
 
 	void setState(CLIENT_STATE state);
 
-	std::thread handler;
+	std::thread receiver;
+	std::thread sender;
 
 	CLIENT_STATE state;
 

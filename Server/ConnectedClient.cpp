@@ -32,85 +32,90 @@ ConnectedClient::~ConnectedClient() {
 }
 
 
-int ConnectedClient::createThread() { // Handler thread creating
-	handler = std::thread(&ConnectedClient::handlerThread, this);
-	handler.detach();
+int ConnectedClient::createThreads() { // Handler threads creating
+	sender = std::thread(&ConnectedClient::senderThread, this);
+	sender.detach();
+
+	receiver = std::thread(&ConnectedClient::receiverThread, this);
+	receiver.detach();
 }
 
-int ConnectedClient::handlePacket(std::unique_ptr<Packet> packet) { // Обработка пакета из очереди
-	if (sendData(std::move(packet))) return 1;
+int ConnectedClient::handlePacketIn(std::function<int(std::shared_ptr<Packet>)>handler) { // Обработка пакета из очереди
+	auto packet = std::make_shared<Packet>(); // TODO: сделать с этим что-нибудь
 
-	// Добавка в вектор всех отправленных пакетов
-	sendedPackets.push_back(std::move(packet));
+	if (int err = receiveData(packet)) return err; // Критическая ошибка или соединение сброшено
 
-	if (packet->needConfirm) {
-		Packet resp;
+	// Добавить пакет
+	receivedPackets.push_back(packet);
 
-		if (receiveData(&resp)) return 2;
+	// Обработка пришедшего пакета
+	handler(packet);
 
-		// Добавка в вектор всех пришедших пакетов
-		receivedPackets.push_back(std::make_unique<Packet>(resp));
+	return 0;
+}
 
-		// Обработка пришедшего пакета
-		cout << "Data received: " << resp.data << endl;
+int handle1(std::shared_ptr<Packet> packet) { // Обработка пакета ACK
+	cout << packet->data << endl;
+}
+
+int handle2(std::shared_ptr<Packet> packet) {
+	cout << packet->data << endl;
+}
+
+int ConnectedClient::handlePacketOut(std::shared_ptr<Packet> packet) { // Обработка пакета из очереди
+	if (sendData(packet)) return 1;
+
+	if (packet->needACK) {
+		if (handlePacketIn(handle1)) return 2;
 	}
 
 	return 0;
 }
 
-void ConnectedClient::handlerThread() { // Поток обработки пакетов
+void ConnectedClient::receiverThread() { // Поток обработки входящих пакетов
+	while (client_started) {
+		if (int err = handlePacketIn(handle2)) {
+			if (err > 0) break;    // Критическая ошибка или соединение сброшено
+			else         continue; // Неудачный пакет, продолжить прием        
+		}
+	}
+
+	// Закрываем поток
+	cout << "Closing receiver thread " << receiver.get_id() << endl;
+}
+
+void ConnectedClient::senderThread() { // Поток отправки пакетов
 	while (client_started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
-			std::unique_ptr<Packet> packet = std::move(mainPackets.back());
+			std::shared_ptr<Packet> packet = mainPackets.back();
 
-			if (handlePacket(std::move(packet))) {
+			if (handlePacket(packet)) {
 				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
-				syncPackets.push_back(std::move(packet));
+				syncPackets.push_back(packet);
 			}
 			
 			mainPackets.pop();
 		}
 
 		// Обработать пакеты, не подтвержденные клиентами
-		auto packet = syncPackets.begin();
-		while (packet != syncPackets.end()) {
-			if (handlePacket(std::move(*packet))) {
+		auto packetIt = syncPackets.begin();
+		while (packetIt != syncPackets.end()) {
+			if (handlePacket(*packetIt)) {
 				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
-				packet++;
+				packetIt++;
 			}
-			else packet = syncPackets.erase(packet);
+			else packetIt = syncPackets.erase(packetIt);
 		}
 
 		Sleep(100);
-	};
-
-	// Закрываем поток
-	cout << "Closing handler thread " << handler.get_id() << endl;
-}
-
-int ConnectedClient::sendData(std::unique_ptr<Packet> packet) {
-	// Send an initial buffer
-	setState(CLIENT_STATE::SEND);
-
-	if (!packet->data) { //Ввести данные
-		std::string req;
-
-		cout << "Type what you want to send to client: " << endl << '>';
-		std::getline(std::cin, req);
-
-		packet = std::make_unique<Packet>(req.c_str(), req.size());
 	}
 
-	if (send(clientSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
-
-	sendedPackets.push_back(std::move(packet));
-
-	setState(CLIENT_STATE::OK);
-	return 0;
+	// Закрываем поток
+	cout << "Closing sender thread " << sender.get_id() << endl;
 }
 
-int ConnectedClient::receiveData(Packet* dest) {
+int ConnectedClient::receiveData(std::shared_ptr<Packet> dest) {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
@@ -118,14 +123,37 @@ int ConnectedClient::receiveData(Packet* dest) {
 
 	int respSize = recv(clientSocket, respBuff, NET_BUFFER_SIZE, 0);
 
-	if (respSize > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-		*dest = Packet(respBuff, respSize);
+	if (respSize > 0) { //Записываем данные от клиента
+		dest->data = respBuff;
+		dest->size = respSize;
+		dest->needConfirm = false;
 	}
 	else if (!respSize) {
 		cout << "Connection closed" << endl;
-		return 2;
+		return 1;
 	}
-	else return 1;
+	else return -1;
+
+	setState(CLIENT_STATE::OK);
+	return 0;
+}
+
+int ConnectedClient::sendData(std::shared_ptr<Packet> packet) {
+	// Send an initial buffer
+	setState(CLIENT_STATE::SEND);
+
+	/*if (!packet->data) { //Ввести данные
+		std::string req;
+
+		cout << "Type what you want to send to client: " << endl << '>';
+		std::getline(std::cin, req);
+
+		packet = std::make_shared<Packet>(req.c_str(), req.size());
+	}*/
+
+	if (send(clientSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
+
+	sendedPackets.push_back(packet);
 
 	setState(CLIENT_STATE::OK);
 	return 0;

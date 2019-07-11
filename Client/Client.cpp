@@ -96,12 +96,12 @@ int Client::sendData() {
 	cout << "Type what you want to send to server: " << endl << '>';
 	std::getline(std::cin, req);
 
-	auto packet = std::make_unique<Packet>((char*)req.c_str(), req.size());
+	auto packet = std::make_shared<Packet>((char*)req.c_str(), req.size());
 
 	int bytesSent = send(connectSocket, packet->data, packet->size, 0);
 	if (bytesSent == SOCKET_ERROR) return 1;
 
-	sendedPackets.push_back(std::move(packet));
+	sendedPackets.push_back(packet);
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -119,7 +119,7 @@ int Client::receiveData() {
 	do {
 		bytesRec = recv(connectSocket, recBuff, NET_BUFFER_SIZE, 0);
 		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_unique<Packet>(recBuff, bytesRec));
+			receivedPackets.push_back(std::make_shared<Packet>(recBuff, bytesRec));
 
 			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
 

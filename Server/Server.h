@@ -23,7 +23,7 @@ public:
 
 	int error_code;
 
-	std::vector<std::unique_ptr<ConnectedClient>> clientPool;
+	std::vector<std::shared_ptr<ConnectedClient>> clientPool;
 
 	int startServer();
 	int closeServer();

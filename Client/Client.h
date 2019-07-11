@@ -36,8 +36,8 @@ public:
 
 	int error_code;
 
-	std::vector<std::unique_ptr<Packet>> receivedPackets;
-	std::vector<std::unique_ptr<Packet>> sendedPackets;
+	std::vector<std::shared_ptr<Packet>> receivedPackets;
+	std::vector<std::shared_ptr<Packet>> sendedPackets;
 
 	int connect2server();
 	int sendData();
