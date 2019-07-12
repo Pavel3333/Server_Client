@@ -1,20 +1,29 @@
 #include "pch.h"
-
+#include <string_view>
 #include "Common.h"
+
 
 Packet::Packet(const char* data, size_t size, bool needACK)
 	: needACK(needACK)
 	, size(size)
 {
-	this->data = new char[size + 2];
+	this->data = new char[size];
 	memcpy(this->data, data, size);
-	this->data[size] = NULL; //NULL-terminator
 
 #ifdef _DEBUG
-	cout << "Packet: " << size << ", data: " << this->data << endl;;
+	cout << *this << endl;
 #endif
 }
 
-Packet::~Packet() {
+
+Packet::~Packet()
+{
 	delete[] this->data;
+}
+
+
+std::ostream& operator<< (std::ostream& os, const Packet& packet)
+{
+	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
+	return os;
 }

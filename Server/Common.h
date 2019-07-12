@@ -3,7 +3,7 @@
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
 
 struct Packet {
-	Packet(const char* data = nullptr, size_t size = 0, bool needACK = false);
+	Packet(const char* data, size_t size, bool needACK);
 	~Packet();
 	char* data;
 	size_t size;
@@ -11,3 +11,5 @@ struct Packet {
 };
 
 typedef std::shared_ptr<Packet> PacketPtr;
+
+std::ostream& operator<< (std::ostream& os, const Packet& val);

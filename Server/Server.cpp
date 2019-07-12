@@ -1,44 +1,54 @@
 #include "pch.h"
-
 #include "Server.h"
+
 
 Server::Server(USHORT port)
     : connectSocket(INVALID_SOCKET)
 	, port(port)
 	, server_started(false)
 {
-	setState(SERVER_STATE::OK);
+	setState(ServerState::Ok);
 }
+
 
 Server::~Server()
 {
-	if (server_started) closeServer();
+	if (server_started)
+		closeServer();
 
-	if (state > SERVER_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
+	int err = 0;
+	if (state > ServerState::InitWinSock)
+		err = WSAGetLastError();
 
-	if (state != SERVER_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
+	if (state != ServerState::Ok)
+		cout << "state " << (int)state << " - error: " << err << endl;
 
-	if (state > SERVER_STATE::GET_ADDR && state <= SERVER_STATE::BIND) freeaddrinfo(socketDesc);
+	if (state > ServerState::GetAddr && state <= ServerState::Bind)
+		freeaddrinfo(socketDesc);
 }
 
 
 int Server::startServer()
 {
 	// Initialize Winsock
-	setState(SERVER_STATE::INIT_WINSOCK);
+	setState(ServerState::InitWinSock);
 
 	WSADATA wsData;
 
-	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsData)) return 1;
+	int err = WSAStartup(MAKEWORD(2, 2), &wsData);
+	if (err)
+		return 1;
 
 	// Create a SOCKET for connecting to clients (UDP protocol)
-	setState(SERVER_STATE::CREATE_SOCKET);
+	setState(ServerState::CreateSocket);
 
-	connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (connectSocket == INVALID_SOCKET) return 2;
+	// connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); - Сѓ РјРµРЅСЏ РЅРµ СЂР°Р±РѕС‚Р°РµС‚
+	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (connectSocket == INVALID_SOCKET)
+		return 2;
 
 	// Bind the socket
-	setState(SERVER_STATE::BIND);
+	setState(ServerState::Bind);
 
 	sockaddr_in hint;
 	ZeroMemory(&hint, sizeof(hint));
@@ -46,39 +56,49 @@ int Server::startServer()
 	hint.sin_port = htons(port);
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	if (error_code = bind(connectSocket, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR) return 1;
+	err = bind(connectSocket, (sockaddr*)&hint, sizeof(hint));
+	if (err == SOCKET_ERROR)
+		return 1;
 
 	// Listening the port
-	setState(SERVER_STATE::LISTEN);
+	setState(ServerState::Listen);
 
-	if (error_code = listen(connectSocket, SOMAXCONN) == SOCKET_ERROR) return 1;
+	err = listen(connectSocket, SOMAXCONN);
+	if (err == SOCKET_ERROR)
+		return 1;
 
 	freeaddrinfo(socketDesc);
 
 	handler = std::thread(&Server::handleRequests, this);
-	handler.detach();
+	handler.join(); // accept РІ РїРѕС‚РѕРєРµ РѕС‡РµРЅСЊ СЃСЃС‚СЂР°РЅРЅРѕ СЃРµР±СЏ РІРµРґРµС‚, РїРѕРєР° join
 
 	cout << "The server is running" << endl;
 
 	server_started = true;
 
-	setState(SERVER_STATE::OK);
+	setState(ServerState::Ok);
 	return 0;
 }
 
+
 int Server::closeServer()
 {
-	if (!server_started) return 0;
+	if (!server_started)
+		return 0;
 
 	// Shutdown the connection since no more data will be sent
-	setState(SERVER_STATE::SHUTDOWN);
+	setState(ServerState::Shutdown);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
+	int err = shutdown(connectSocket, SD_SEND);
+	if (err == SOCKET_ERROR)
+		cout << "Error while shutdowning connection" << endl;
 
 	// Close the socket
-	setState(SERVER_STATE::CLOSE_SOCKET);
+	setState(ServerState::CloseSocket);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
+	err = closesocket(connectSocket);
+	if (err == SOCKET_ERROR)
+		cout << "Error while closing socket" << endl;
 
 	WSACleanup();
 
@@ -86,37 +106,39 @@ int Server::closeServer()
 
 	server_started = false;
 
-	setState(SERVER_STATE::OK);
+	setState(ServerState::Ok);
 	return 0;
 }
 
-int Server::handshake_1(ConnectedClientPtr client, SOCKET socket) { // Первое рукопожатие с соединенным клиентом
-	/*
-	Присвоить сокет на запись
-	*/
-	setState(SERVER_STATE::HANDSHAKE_1);
 
-	client->writeSocket = socket;
+// РџРµСЂРІРѕРµ СЂСѓРєРѕРїРѕР¶Р°С‚РёРµ СЃ СЃРѕРµРґРёРЅРµРЅРЅС‹Рј РєР»РёРµРЅС‚РѕРј
+int Server::first_handshake(ConnectedClient& client, SOCKET socket)
+{
+	// РџСЂРёСЃРІРѕРёС‚СЊ СЃРѕРєРµС‚ РЅР° Р·Р°РїРёСЃСЊ
+	setState(ServerState::FirstHandshake);
 
-	setState(SERVER_STATE::OK);
+	client.writeSocket = socket;
+
+	setState(ServerState::Ok);
 	return 0;
 }
 
-int Server::handshake_2(ConnectedClientPtr client, SOCKET socket) { // Второе рукопожатие с соединенным клиентом
-	/*
-	Присвоить сокет на чтение
-	Создать потоки-обработчики
-	Отправить пакет ACK, подтвердить получение
-	*/
-	setState(SERVER_STATE::HANDSHAKE_2);
 
-	client->readSocket = socket;
-	client->started    = true;
-	client->createThreads();
+// Р’С‚РѕСЂРѕРµ СЂСѓРєРѕРїРѕР¶Р°С‚РёРµ СЃ СЃРѕРµРґРёРЅРµРЅРЅС‹Рј РєР»РёРµРЅС‚РѕРј
+int Server::second_handshake(ConnectedClient& client, SOCKET socket)
+{
+	// РџСЂРёСЃРІРѕРёС‚СЊ СЃРѕРєРµС‚ РЅР° С‡С‚РµРЅРёРµ
+	// РЎРѕР·РґР°С‚СЊ РїРѕС‚РѕРєРё-РѕР±СЂР°Р±РѕС‚С‡РёРєРё
+	// РћС‚РїСЂР°РІРёС‚СЊ РїР°РєРµС‚ ACK, РїРѕРґС‚РІРµСЂРґРёС‚СЊ РїРѕР»СѓС‡РµРЅРёРµ
+	setState(ServerState::SecondHandshake);
 
-	//TODO: Отправить пакет ACK, подтвердить получение
+	client.readSocket = socket;
+	client.started    = true;
+	client.createThreads();
 
-	setState(SERVER_STATE::OK);
+	//TODO: РћС‚РїСЂР°РІРёС‚СЊ РїР°РєРµС‚ ACK, РїРѕРґС‚РІРµСЂРґРёС‚СЊ РїРѕР»СѓС‡РµРЅРёРµ
+
+	setState(ServerState::Ok);
 	return 0;
 }
 
@@ -133,55 +155,67 @@ void Server::handleRequests()
 		cout << "Wait for client..." << endl;
 
 		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&clientDesc, &clientLen);
-		if (clientSocket == INVALID_SOCKET) continue;
+		if (clientSocket == INVALID_SOCKET)
+			continue;
 
 		// Connected to client
-		setState(SERVER_STATE::CONNECT);
+		setState(ServerState::Connect);
 
-		unsigned long IP = clientDesc.sin_addr.s_addr;
+		uint32_t client_ip = clientDesc.sin_addr.s_addr;
 
-		auto clientWithSameIP = std::find_if(clientPool.cbegin(), clientPool.cend(), [IP](ConnectedClientPtr p) { return p->clientDesc.sin_addr.s_addr == IP; });
-		
-		if (clientWithSameIP != clientPool.cend()) { // Уже есть клиент с таким же IP, продолжить рукопожатие
-			if (handshake_2(*clientWithSameIP, clientSocket)) cout << "Error while second handshaking. Client ID:" << (*clientWithSameIP)->ID << endl;
+		// РїРѕР»СѓС‡Р°РµРј РёС‚РµСЂР°С‚РѕСЂ
+		auto client_it = clientPool.find(client_ip);
+		if (client_it != end(clientPool)) {
+			ConnectedClient& client = *(client_it->second);
+
+			// РЈР¶Рµ РµСЃС‚СЊ РєР»РёРµРЅС‚ СЃ С‚Р°РєРёРј Р¶Рµ IP, РїСЂРѕРґРѕР»Р¶РёС‚СЊ СЂСѓРєРѕРїРѕР¶Р°С‚РёРµ
+			if (second_handshake(client, clientSocket)) {
+				cout << "Error while second handshaking. "
+					 << "Client ID: " << client.ID << endl;
+			}
 		}
-		else {                                       // Такого клиента нет, добавить и начать рукопожатие
+		else {
+			// РўР°РєРѕРіРѕ РєР»РёРµРЅС‚Р° РЅРµС‚, РґРѕР±Р°РІРёС‚СЊ Рё РЅР°С‡Р°С‚СЊ СЂСѓРєРѕРїРѕР¶Р°С‚РёРµ
 			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
 
-			clientPool.push_back(client);
+			clientPool[client_ip] = client;
 
-			if(handshake_1(client, clientSocket)) cout << "Error while first handshaking. Client ID:" << client->ID << endl;
+			if (first_handshake(*client, clientSocket))
+				cout << "Error while first handshaking. Client ID:"
+					 << client->ID << endl;
 		}
 
-		Sleep(500);
+		// accept Р±Р»РѕРєРёСЂСѓСЋС‰Р°СЏ РѕРїРµСЂР°С†РёСЏ, Sleep РЅРµ РЅСѓР¶РµРЅ
+		 Sleep(500);
 	}
 
 	cout << "Client connections count limit exceeded" << endl;
 
-	setState(SERVER_STATE::OK);
+	setState(ServerState::Ok);
 }
 
-void Server::setState(SERVER_STATE state)
+
+void Server::setState(ServerState state)
 {
 #ifdef _DEBUG
-	const char state_desc[32];
+	const char* state_desc;
 
-#define PRINT_STATE(X) case SERVER_STATE:: X: \
+#define PRINT_STATE(X) case ServerState:: X: \
 	state_desc = #X; \
 	break;
 
 	switch (state) {
-		PRINT_STATE(OK);
-		PRINT_STATE(INIT_WINSOCK);
-		PRINT_STATE(GET_ADDR);
-		PRINT_STATE(CREATE_SOCKET);
-		PRINT_STATE(BIND);
-		PRINT_STATE(LISTEN);
-		PRINT_STATE(CONNECT);
-		PRINT_STATE(HANDSHAKE_1);
-		PRINT_STATE(HANDSHAKE_2);
-		PRINT_STATE(SHUTDOWN);
-		PRINT_STATE(CLOSE_SOCKET);
+		PRINT_STATE(Ok)
+		PRINT_STATE(InitWinSock)
+		PRINT_STATE(GetAddr)
+		PRINT_STATE(CreateSocket)
+		PRINT_STATE(Bind)
+		PRINT_STATE(Listen)
+		PRINT_STATE(Connect)
+		PRINT_STATE(FirstHandshake)
+		PRINT_STATE(SecondHandshake)
+		PRINT_STATE(Shutdown)
+		PRINT_STATE(CloseSocket)
 	default:
 		std::cout << "Unknown state: " << (int)state << std::endl;
 		return;

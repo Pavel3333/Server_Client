@@ -1,52 +1,47 @@
 #pragma once
-
+#include <map>
 #include "Common.h"
-
 #include "ConnectedClient.h"
 
-typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;
 
-enum class SERVER_STATE {
-	OK = 0,
-	INIT_WINSOCK,
-	GET_ADDR,
-	CREATE_SOCKET,
-	BIND,
-	LISTEN,
-	CONNECT,
-	HANDSHAKE_1,
-	HANDSHAKE_2,
-	SHUTDOWN,
-	CLOSE_SOCKET
+enum class ServerState {
+	Ok = 0, // bad state, need to remove
+	InitWinSock,
+	GetAddr, // unused now
+	CreateSocket,
+	Bind,
+	Listen,
+	Connect,
+	FirstHandshake,
+	SecondHandshake,
+	Shutdown,
+	CloseSocket
 };
+
 
 class Server {
 public:
 	Server(USHORT port);
 	~Server();
 
-	std::vector<ConnectedClientPtr> clientPool;
+	std::map<uint32_t, ConnectedClientPtr> clientPool;
 
 	int startServer();
 	int closeServer();
+
 private:
-	int handshake_1(ConnectedClientPtr client, SOCKET socket);
-	int handshake_2(ConnectedClientPtr client, SOCKET socket);
+	int first_handshake(ConnectedClient& client, SOCKET socket);
+	int second_handshake(ConnectedClient& client, SOCKET socket);
 
 	void handleRequests();
-	void setState(SERVER_STATE state);
+	void setState(ServerState state);
 
 	std::thread handler;
 
-	int error_code;
-
-	SERVER_STATE state;
+	bool server_started;
+	ServerState state;
 
 	uint16_t port;
-
-	bool server_started;
-
-	char port_str[7];
 
 	SOCKET connectSocket;
 

@@ -1,6 +1,8 @@
 #include "pch.h"
-
+#include <array>
+#include <functional>
 #include "ConnectedClient.h"
+
 
 ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int clientLen)
 	: readSocket(INVALID_SOCKET)
@@ -27,20 +29,23 @@ ConnectedClient::~ConnectedClient() {
 
 	// Вывод сообщения об ошибке
 
-	if (state != CLIENT_STATE::OK) cout << "state " << (int)state << " - error: " << error_code << endl;
+	if (state != CLIENT_STATE::OK)
+		cout << "state " << (int)state << " - error: " << error_code << endl;
 	else if (!receivedPackets.empty()) {
 #ifdef _DEBUG
 		cout << "All received data:" << endl;
 		size_t i = 1;
 
-		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+		for (auto& it : receivedPackets)
+			cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
 #endif
 
 		receivedPackets.clear();
 	}
 }
 
-void ConnectedClient::createThreads() {
+void ConnectedClient::createThreads()
+{
 	sender = std::thread(&ConnectedClient::senderThread, this);
 	sender.detach();
 
@@ -48,18 +53,31 @@ void ConnectedClient::createThreads() {
 	receiver.detach();
 }
 
-int ConnectedClient::handle1(PacketPtr packet) { // Обработка пакета ACK
+
+// Обработка пакета ACK
+int ConnectedClient::ack_handler(PacketPtr packet)
+{
 	cout << packet->data << endl;
+	return 0;
 }
 
-int ConnectedClient::handle2(PacketPtr packet) { // Обработка любого входящего пакета
+
+// Обработка любого входящего пакета
+int ConnectedClient::any_packet_handler(PacketPtr packet)
+{
 	cout << packet->data << endl;
+	return 0;
 }
 
-int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // Обработка пакета из очереди
-	auto packet = std::make_shared<Packet>(); // TODO: сделать с этим что-нибудь
 
-	if (int err = receiveData(packet)) return err; // Произошла ошибка
+// Обработка пакета из очереди
+int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
+{
+	PacketPtr packet; // TODO: сделать с этим что-нибудь
+
+	int err = receiveData(packet);
+	if (err)
+		return err; // Произошла ошибка
 
 	// Добавить пакет
 	receivedPackets.push_back(packet);
@@ -68,19 +86,29 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // �
 	return handler(packet);
 }
 
-int ConnectedClient::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
-	if (sendData(packet)) return 1;
+
+int ConnectedClient::handlePacketOut(PacketPtr packet)
+{
+	// Обработка пакета из очереди
+
+	if (sendData(packet))
+		return 1;
 
 	if (packet->needACK) {
-		if (handlePacketIn(this->handle1)) return 2;  //FIX ME
+		if (handlePacketIn(std::bind(&ConnectedClient::ack_handler, this, std::placeholders::_1)))
+			return 2;  //FIX ME
 	}
 
 	return 0;
 }
 
-void ConnectedClient::receiverThread() { // Поток обработки входящих пакетов
+
+// Поток обработки входящих пакетов
+void ConnectedClient::receiverThread()
+{
 	while (started) {
-		if (int err = handlePacketIn(this->handle2)) {  //FIX ME
+		int err = handlePacketIn(std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1));
+		if (err) {  //FIX ME
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
 		}
@@ -90,7 +118,10 @@ void ConnectedClient::receiverThread() { // Поток обработки вхо
 	cout << "Closing receiver thread " << receiver.get_id() << endl;
 }
 
-void ConnectedClient::senderThread() { // Поток отправки пакетов
+
+// Поток отправки пакетов
+void ConnectedClient::senderThread()
+{
 	while (started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
@@ -121,18 +152,17 @@ void ConnectedClient::senderThread() { // Поток отправки пакет
 	cout << "Closing sender thread " << sender.get_id() << endl;
 }
 
-int ConnectedClient::receiveData(PacketPtr dest) {
+int ConnectedClient::receiveData(PacketPtr& dest)
+{
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
-	char respBuff[NET_BUFFER_SIZE];
+	std::array<char, NET_BUFFER_SIZE> respBuff;
+	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 
-	int respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
-
-	if (respSize > 0) { //Записываем данные от клиента
-		dest->data = respBuff;
-		dest->size = respSize;
-		dest->needACK = false;
+	if (respSize > 0) {
+		//Записываем данные от клиента
+		dest = std::make_shared<Packet>(respBuff.data(), respSize, false);
 	}
 	else if (!respSize) {
 		cout << "Connection closed" << endl;
@@ -191,9 +221,9 @@ int ConnectedClient::disconnect() {
 void ConnectedClient::setState(CLIENT_STATE state)
 {
 #ifdef _DEBUG
-	const char state_desc[32];
+	const char* state_desc;
 
-#define PRINT_STATE(X) case SERVER_STATE:: X: \
+#define PRINT_STATE(X) case CLIENT_STATE:: X: \
 	state_desc = #X; \
 	break;
 

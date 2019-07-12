@@ -31,7 +31,7 @@ public:
 
 	void createThreads();
 
-	int receiveData(PacketPtr dest);
+	int receiveData(PacketPtr& dest);
 	int sendData(PacketPtr packet);
 
 	int disconnect();
@@ -41,8 +41,8 @@ public:
 	SOCKET readSocket;
 	SOCKET writeSocket;
 private:
-	int handle1(PacketPtr packet);
-	int handle2(PacketPtr packet);
+	int ack_handler(PacketPtr packet);
+	int any_packet_handler(PacketPtr packet);
 
 	int handlePacketIn(std::function<int(PacketPtr)>handler);
 	int handlePacketOut(PacketPtr packet);
@@ -66,3 +66,5 @@ private:
 
 	uint16_t port;
 };
+
+typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;
