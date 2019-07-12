@@ -337,7 +337,7 @@ void Client::setState(ClientState state)
 #ifdef _DEBUG
 	const char* state_desc;
 
-#define PRINT_STATE(X) case CLIENT_STATE::X: \
+#define PRINT_STATE(X) case ClientState::X: \
 	state_desc = #X;                         \
 	break;
 
