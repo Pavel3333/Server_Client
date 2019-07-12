@@ -14,14 +14,15 @@ int start()
 	if (server.startServer())
 		return 1;
 
-	 log_raw("You can use these commands to manage the server:\n  \"close\" -> Close the server");
+	log_raw("You can use these commands to manage the server:\n"
+		    "  \"close\" -> Close the server");
 
 	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
 
 		std::cin >> cmd;
 
-		if     (cmd == "close") { // Закрытие сервера
+		if (cmd == "close") { // Закрытие сервера
 			if (server.closeServer())
 				return 2;
 		}
