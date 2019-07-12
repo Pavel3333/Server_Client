@@ -128,7 +128,8 @@ int Server::initSockets() {
 	setState(ServerState::CreateReadSocket);
 
 	listeningReadSocket = initSocket(readPort);
-	if (listeningReadSocket == INVALID_SOCKET) return 1;
+	if (listeningReadSocket == INVALID_SOCKET)
+		return 1;
 
 	log("The server can accept clients on the port %d", readPort);
 
@@ -136,7 +137,8 @@ int Server::initSockets() {
 	setState(ServerState::CreateWriteSocket);
 
 	listeningWriteSocket = initSocket(writePort);
-	if (listeningWriteSocket) return 1;
+	if (listeningWriteSocket == INVALID_SOCKET)
+		return 1;
 
 	log("The server can accept clients on the port %d", writePort);
 
