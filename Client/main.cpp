@@ -18,8 +18,8 @@ int start() {
 
 int main()
 {
-	if (int err = start()) cout << "Client creating failed - error: " << err << endl;
-	else                   cout << "Client created successfully!" << endl;
+	if (int err = start())
+		log("Client creating failed - error: %d", err);
 
 	int v;
 	std::cin >> v; //Чтобы не закрывалось окно

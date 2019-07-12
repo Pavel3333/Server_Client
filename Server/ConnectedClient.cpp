@@ -17,7 +17,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	cout << "Client " << ID << " (IP: " << IP_str << ", host: " << host << ") connected on port " << port << endl;
+	log("Client %d (IP: %s, host: %s) connected on port %d", ID, IP_str, host, port);
 
 	setState(CLIENT_STATE::OK);
 }
@@ -25,19 +25,15 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 ConnectedClient::~ConnectedClient() {
 	if(started) disconnect();
 
-	error_code = WSAGetLastError();
-
-	// Вывод сообщения об ошибке
-
-	if (state != CLIENT_STATE::OK)
-		cout << "state " << (int)state << " - error: " << error_code << endl;
-	else if (!receivedPackets.empty()) {
+	if (!receivedPackets.empty()) {
 #ifdef _DEBUG
+		msg_mutex.lock();
 		cout << "All received data:" << endl;
 		size_t i = 1;
 
 		for (auto& it : receivedPackets)
 			cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+		msg_mutex.unlock();
 #endif
 
 		receivedPackets.clear();
@@ -57,7 +53,7 @@ void ConnectedClient::createThreads()
 // Обработка пакета ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	cout << packet->data << endl;
+	log_raw(packet->data);
 	return 0;
 }
 
@@ -65,7 +61,7 @@ int ConnectedClient::ack_handler(PacketPtr packet)
 // Обработка любого входящего пакета
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	cout << packet->data << endl;
+	log_raw(packet->data);
 	return 0;
 }
 
@@ -115,7 +111,7 @@ void ConnectedClient::receiverThread()
 	}
 
 	// Закрываем поток
-	cout << "Closing receiver thread " << receiver.get_id() << endl;
+	log("Closing receiver thread %d", receiver.get_id());
 }
 
 
@@ -128,7 +124,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
+				log_raw("Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
 				syncPackets.push_back(packet);
 			}
 			
@@ -139,7 +135,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
+				log_raw("Packet not confirmed"); // TODO: писать Packet ID
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -149,7 +145,7 @@ void ConnectedClient::senderThread()
 	}
 
 	// Закрываем поток
-	cout << "Closing sender thread " << sender.get_id() << endl;
+	log("Closing sender thread %d", sender.get_id());
 }
 
 int ConnectedClient::receiveData(PacketPtr& dest)
@@ -165,7 +161,7 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 		dest = std::make_shared<Packet>(respBuff.data(), respSize, false);
 	}
 	else if (!respSize) {
-		cout << "Connection closed" << endl;
+		log_raw("Connection closed");
 		return 1;
 	}
 	else {
@@ -184,7 +180,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 	/*if (!packet->data) { //Ввести данные
 		std::string req;
 
-		cout << "Type what you want to send to client: " << endl << '>';
+		log_raw_nonl("Type what you want to send to client: \n>";
 		std::getline(std::cin, req);
 
 		packet = std::make_shared<Packet>(req.c_str(), req.size());
@@ -204,19 +200,29 @@ int ConnectedClient::sendData(PacketPtr packet) {
 int ConnectedClient::disconnect() {
 	if (!started) return 0;
 
+	started = false;
+
+	// Closing handler threads
+
+	if (receiver.joinable())
+		receiver.join();
+
+	if (sender.joinable())
+		sender.join();
+
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket:" << WSAGetLastError() << endl;
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket:" << WSAGetLastError() << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning read socket: %d", WSAGetLastError());
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket:" << WSAGetLastError() << endl;
-	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket:" << WSAGetLastError() << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) log("Error while closing read socket: %d", WSAGetLastError());
+	if (closesocket(writeSocket) == SOCKET_ERROR) log("Error while closing write socket: %d", WSAGetLastError());
 
-	cout << "Connected client " << ID << " was stopped" << endl;
+	log("Connected client %d was stopped", ID);
 
 	started = false;
 
@@ -240,12 +246,12 @@ void ConnectedClient::setState(CLIENT_STATE state)
 		PRINT_STATE(SHUTDOWN);
 		PRINT_STATE(CLOSE_SOCKET);
 	default:
-		std::cout << "Unknown state: " << (int)state << std::endl;
+		log("Unknown state: %d", (int)state);
 		return;
 }
 #undef PRINT_STATE
 
-	std::cout << "State changed to: " << state_desc << std::endl;
+	log("State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

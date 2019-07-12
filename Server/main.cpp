@@ -13,6 +13,8 @@ int start()
 	if (server.startServer())
 		return 1;
 
+	 log_raw("You can use these commands to manage the server:\n  \"close\" -> Close the server");
+
 	while (server.started) { // Прием команд из командной строки
 		std::string cmd;
 
@@ -32,7 +34,7 @@ int start()
 int main()
 {
 	if (int err = start())
-		cout << "Server creating failed - error: " << err << endl;
+		log("Server creating failed - error: %d", err);
 
 	std::cin.get(); //Чтобы не закрывалось окно
 

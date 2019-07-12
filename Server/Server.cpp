@@ -64,7 +64,7 @@ int Server::startServer()
 		return 1;
 	}
 
-	cout << "The server is running" << endl;
+	log_raw("The server is running");
 
 	started = true;
 
@@ -90,13 +90,11 @@ int Server::closeServer()
 
 	int err = closesocket(connectSocket);
 	if (err == SOCKET_ERROR)
-		cout << "Error while closing socket: " << WSAGetLastError() << endl;
+		log("Error while closing socket: %d", WSAGetLastError());
 
 	WSACleanup();
 
-	cout << "The server was stopped" << endl;
-
-	started = false;
+	log_raw("The server was stopped");
 
 	return 0;
 }
@@ -141,7 +139,7 @@ void Server::handleRequests()
 	uint16_t clientID = 0;
 
 	while (started && clientPool.size() < 10) {
-		cout << "Wait for client..." << endl;
+		 log_raw("Wait for client...");
 
 		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&clientDesc, &clientLen);
 		if (clientSocket == INVALID_SOCKET)
@@ -159,8 +157,7 @@ void Server::handleRequests()
 
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			if (second_handshake(client, clientSocket)) {
-				cout << "Error while second handshaking. "
-					 << "Client ID: " << client.ID << endl;
+				log("Error while second handshaking. Client ID: %d", client.ID);
 			}
 		}
 		else {
@@ -170,12 +167,11 @@ void Server::handleRequests()
 			clientPool[client_ip] = client;
 
 			if (first_handshake(*client, clientSocket))
-				cout << "Error while first handshaking. Client ID:"
-					 << client->ID << endl;
+				log("Error while first handshaking. Client ID: %d", client->ID);
 		}
 	}
 
-	if(clientPool.size() == 10) cout << "Client connections count limit exceeded" << endl;
+	if(clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
 }
 
 
@@ -185,7 +181,7 @@ void Server::setState(ServerState state)
 	const char* state_desc;
 
 #define PRINT_STATE(X) case ServerState:: X: \
-	state_desc = #X; \
+	state_desc = #X;                         \
 	break;
 
 	switch (state) {
@@ -200,12 +196,12 @@ void Server::setState(ServerState state)
 		PRINT_STATE(Shutdown)
 		PRINT_STATE(CloseSocket)
 	default:
-		std::cout << "Unknown state: " << (int)state << std::endl;
+		log("Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	std::cout << "State changed to: " << state_desc << std::endl;
+	log("State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

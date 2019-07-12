@@ -2,7 +2,6 @@
 
 #include "Common.h"
 
-#include <queue>
 #include <thread>
 #include <memory>
 #include <functional>
@@ -54,8 +53,6 @@ private:
 
 	std::thread receiver;
 	std::thread sender;
-
-	int error_code;
 
 	CLIENT_STATE state;
 

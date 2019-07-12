@@ -3,6 +3,40 @@
 #include "Client.h"
 
 
+std::mutex msg_mutex;
+
+void log_raw_nonl(const char* str) {
+	msg_mutex.lock();
+	cout << str;
+	msg_mutex.unlock();
+}
+
+void log_raw(const char* str) {
+	msg_mutex.lock();
+	cout << str << endl;
+	msg_mutex.unlock();
+}
+
+
+void log_nonl(const char* fmt, ...) {
+	msg_mutex.lock();
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+	msg_mutex.unlock();
+}
+
+void log(const char* fmt, ...) {
+	msg_mutex.lock();
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+	cout << endl;
+	msg_mutex.unlock();
+}
+
 Packet::Packet(const char* data, size_t size, bool needACK)
 	: needACK(needACK)
 	, size(size)
@@ -11,21 +45,22 @@ Packet::Packet(const char* data, size_t size, bool needACK)
 	memcpy(this->data, data, size);
 
 #ifdef _DEBUG
-	cout << *this << endl;
+	log("Packet: %d bytes, data: %s", size, std::string_view(data, size));
+	//cout << *this << endl;
 #endif
 }
 
 Packet::~Packet() { delete[] this->data; }
 
 
-std::ostream& operator<< (std::ostream& os, const Packet& packet)
-{
-	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
-	return os;
-}
+//std::ostream& operator<< (std::ostream& os, const Packet& packet)
+//{
+//	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
+//	return os;
+//}
 
 
-void __wsa_print_err(const char* file, uint16_t line) { cout << file << ":" << line << " - WSA Error " << WSAGetLastError() << endl; }
+void __wsa_print_err(const char* file, uint16_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }
 
 
 Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
@@ -42,10 +77,12 @@ Client::~Client() {
 
 	if (!receivedPackets.empty()) {
 #ifdef _DEBUG
+		msg_mutex.lock();
 		cout << "All received data:" << endl;
 		size_t i = 1;
 
 		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
+		msg_mutex.unlock();
 #endif
 
 		receivedPackets.clear();
@@ -98,14 +135,14 @@ int Client::handshake() {
 
 	if(connect2server(readPort)) return 1;
 
-	cout << "The client can read the data from the port " << readPort << endl;
+	log("The client can read the data from the port %d", readPort);
 
 	// Create a write socket that sending data to the server (UDP protocol)
 	setState(ClientState::CreateWriteSocket);
 
 	if (connect2server(writePort)) return 1;
 
-	cout << "The client can write the data to the port " << writePort << endl;
+	log("The client can write the data to the port %d", writePort);
 
 	//TODO: receive ACK from the server
 
@@ -125,12 +162,12 @@ void Client::createThreads() {
 }
 
 int Client::ack_handler(PacketPtr packet) { // Обработка пакета ACK
-	cout << packet->data << endl;
+	log_raw(packet->data);
 	return 0;
 }
 
 int Client::any_packet_handler(PacketPtr packet) { // Обработка любого входящего пакета
-	cout << packet->data << endl;
+	log_raw(packet->data);
 	return 0;
 }
 
@@ -166,7 +203,7 @@ void Client::receiverThread() { // Поток обработки входящих пакетов
 	}
 
 	// Закрываем поток
-	cout << "Closing receiver thread " << receiver.get_id() << endl;
+	log("Closing receiver thread %d", receiver.get_id());
 }
 
 void Client::senderThread() { // Поток отправки пакетов
@@ -176,7 +213,7 @@ void Client::senderThread() { // Поток отправки пакетов
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
+				log_raw("Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
 				syncPackets.push_back(packet);
 			}
 
@@ -187,7 +224,7 @@ void Client::senderThread() { // Поток отправки пакетов
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
+				log_raw("Packet not confirmed"); // TODO: писать Packet ID
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -197,7 +234,7 @@ void Client::senderThread() { // Поток отправки пакетов
 	}
 
 	// Закрываем поток
-	cout << "Closing sender thread " << sender.get_id() << endl;
+	log("Closing sender thread %d", sender.get_id());
 }
 
 int Client::sendData(PacketPtr packet) {
@@ -207,7 +244,8 @@ int Client::sendData(PacketPtr packet) {
 	/*if (!packet->data) { //Ввести данные
 		std::string req;
 
-		cout << "Type what you want to send to client: " << endl << '>';
+		log_raw("Type what you want to send to client: \n>");
+
 		std::getline(std::cin, req);
 
 		packet = std::make_shared<Packet>(req.c_str(), req.size());
@@ -237,7 +275,7 @@ int Client::receiveData(PacketPtr dest) {
 		dest->needACK = false;
 	}
 	else if (!respSize) {
-		cout << "Connection closed" << endl;
+		log_raw("Connection closed");
 		return 1;
 	}
 	else {
@@ -254,18 +292,18 @@ int Client::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(ClientState::Shutdown);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket:" << WSAGetLastError() << endl;
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket:" << WSAGetLastError() << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning read socket: %d", WSAGetLastError());
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
 	setState(ClientState::CloseSockets);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket:" << WSAGetLastError() << endl;
-	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket:" << WSAGetLastError() << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) log("Error while closing read socket: %d", WSAGetLastError());
+	if (closesocket(writeSocket) == SOCKET_ERROR) log("Error while closing write socket: %d", WSAGetLastError());
 
 	WSACleanup();
 
-	cout << "The client was stopped" << endl;
+	log_raw("The client was stopped");
 
 	started = false;
 
@@ -275,8 +313,10 @@ int Client::disconnect() {
 void Client::setState(ClientState state)
 {
 #ifdef _DEBUG
-#define PRINT_STATE(X) case CLIENT_STATE::X:           \
-	std::cout << "State changed to: " #X << std::endl; \
+	const char* state_desc;
+
+#define PRINT_STATE(X) case CLIENT_STATE::X: \
+	state_desc = #X;                         \
 	break;
 
 	switch (state) {
@@ -289,10 +329,12 @@ void Client::setState(ClientState state)
 		PRINT_STATE(RECEIVE);
 		PRINT_STATE(CLOSE_SOCKET);
 	default:
-		std::cout << "Unknown state: " << (int)state << std::endl;
+		log("Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
+
+	log("State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

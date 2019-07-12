@@ -2,6 +2,7 @@
 
 #include "pch.h"
 
+#include <mutex>
 #include <queue>
 #include <thread>
 #include <functional>
@@ -25,6 +26,14 @@ enum class ClientState : uint8_t {
 	CloseSockets
 };
 
+extern std::mutex msg_mutex;
+
+void log_raw_nonl(const char* str); // without new line
+void log_raw(const char* str);
+
+void log_nonl(const char* fmt, ...); // without new line
+void log(const char* fmt, ...);
+
 struct Packet {
 	Packet(const char* data, size_t size, bool needACK);
 	~Packet();
@@ -35,7 +44,7 @@ struct Packet {
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
-std::ostream& operator<< (std::ostream& os, const Packet& val);
+//std::ostream& operator<< (std::ostream& os, const Packet& val);
 
 // Print WSA errors
 void __wsa_print_err(const char* file, uint16_t line);
