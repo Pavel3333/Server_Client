@@ -5,26 +5,15 @@
 Server::Server(USHORT port)
     : connectSocket(INVALID_SOCKET)
 	, port(port)
-	, server_started(false)
+	, started(false)
 {
-	setState(ServerState::Ok);
 }
 
 
 Server::~Server()
 {
-	if (server_started)
+	if (started)
 		closeServer();
-
-	int err = 0;
-	if (state > ServerState::InitWinSock)
-		err = WSAGetLastError();
-
-	if (state != ServerState::Ok)
-		cout << "state " << (int)state << " - error: " << err << endl;
-
-	if (state > ServerState::GetAddr && state <= ServerState::Bind)
-		freeaddrinfo(socketDesc);
 }
 
 
@@ -36,16 +25,20 @@ int Server::startServer()
 	WSADATA wsData;
 
 	int err = WSAStartup(MAKEWORD(2, 2), &wsData);
-	if (err)
+	if (err) {
+		wsa_print_err();
 		return 1;
+	}
 
 	// Create a SOCKET for connecting to clients (UDP protocol)
 	setState(ServerState::CreateSocket);
 
 	// connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); - у меня не работает
 	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (connectSocket == INVALID_SOCKET)
+	if (connectSocket == INVALID_SOCKET) {
+		wsa_print_err();
 		return 2;
+	}
 
 	// Bind the socket
 	setState(ServerState::Bind);
@@ -57,56 +50,54 @@ int Server::startServer()
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
 	err = bind(connectSocket, (sockaddr*)&hint, sizeof(hint));
-	if (err == SOCKET_ERROR)
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
 		return 1;
+	}
 
 	// Listening the port
 	setState(ServerState::Listen);
 
 	err = listen(connectSocket, SOMAXCONN);
-	if (err == SOCKET_ERROR)
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
 		return 1;
-
-	freeaddrinfo(socketDesc);
-
-	handler = std::thread(&Server::handleRequests, this);
-	handler.join(); // accept в потоке очень сстранно себя ведет, пока join
+	}
 
 	cout << "The server is running" << endl;
 
-	server_started = true;
+	started = true;
 
-	setState(ServerState::Ok);
+	handler = std::thread(&Server::handleRequests, this);
+	handler.detach(); //join(); // accept в потоке очень странно себя ведет, пока join
+
 	return 0;
 }
 
 
 int Server::closeServer()
 {
-	if (!server_started)
+	if (!started)
 		return 0;
 
-	// Shutdown the connection since no more data will be sent
-	setState(ServerState::Shutdown);
+	started = false;
 
-	int err = shutdown(connectSocket, SD_SEND);
-	if (err == SOCKET_ERROR)
-		cout << "Error while shutdowning connection" << endl;
+	if(handler.joinable())
+		handler.join();
 
 	// Close the socket
 	setState(ServerState::CloseSocket);
 
-	err = closesocket(connectSocket);
+	int err = closesocket(connectSocket);
 	if (err == SOCKET_ERROR)
-		cout << "Error while closing socket" << endl;
+		cout << "Error while closing socket: " << WSAGetLastError() << endl;
 
 	WSACleanup();
 
 	cout << "The server was stopped" << endl;
 
-	server_started = false;
+	started = false;
 
-	setState(ServerState::Ok);
 	return 0;
 }
 
@@ -119,7 +110,6 @@ int Server::first_handshake(ConnectedClient& client, SOCKET socket)
 
 	client.writeSocket = socket;
 
-	setState(ServerState::Ok);
 	return 0;
 }
 
@@ -138,7 +128,6 @@ int Server::second_handshake(ConnectedClient& client, SOCKET socket)
 
 	//TODO: Отправить пакет ACK, подтвердить получение
 
-	setState(ServerState::Ok);
 	return 0;
 }
 
@@ -151,7 +140,7 @@ void Server::handleRequests()
 
 	uint16_t clientID = 0;
 
-	while (clientPool.size() < 10) {
+	while (started && clientPool.size() < 10) {
 		cout << "Wait for client..." << endl;
 
 		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&clientDesc, &clientLen);
@@ -184,14 +173,9 @@ void Server::handleRequests()
 				cout << "Error while first handshaking. Client ID:"
 					 << client->ID << endl;
 		}
-
-		// accept блокирующая операция, Sleep не нужен
-		 Sleep(500);
 	}
 
-	cout << "Client connections count limit exceeded" << endl;
-
-	setState(ServerState::Ok);
+	if(clientPool.size() == 10) cout << "Client connections count limit exceeded" << endl;
 }
 
 
@@ -207,7 +191,6 @@ void Server::setState(ServerState state)
 	switch (state) {
 		PRINT_STATE(Ok)
 		PRINT_STATE(InitWinSock)
-		PRINT_STATE(GetAddr)
 		PRINT_STATE(CreateSocket)
 		PRINT_STATE(Bind)
 		PRINT_STATE(Listen)

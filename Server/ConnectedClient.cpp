@@ -73,7 +73,7 @@ int ConnectedClient::any_packet_handler(PacketPtr packet)
 // Обработка пакета из очереди
 int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
 {
-	PacketPtr packet; // TODO: сделать с этим что-нибудь
+	PacketPtr packet;
 
 	int err = receiveData(packet);
 	if (err)
@@ -96,7 +96,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet)
 
 	if (packet->needACK) {
 		if (handlePacketIn(std::bind(&ConnectedClient::ack_handler, this, std::placeholders::_1)))
-			return 2;  //FIX ME
+			return 2;
 	}
 
 	return 0;
@@ -108,7 +108,7 @@ void ConnectedClient::receiverThread()
 {
 	while (started) {
 		int err = handlePacketIn(std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1));
-		if (err) {  //FIX ME
+		if (err) {
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
 		}
@@ -168,7 +168,10 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 		cout << "Connection closed" << endl;
 		return 1;
 	}
-	else return -1;
+	else {
+		wsa_print_err();
+		return -1;
+	}
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -187,7 +190,10 @@ int ConnectedClient::sendData(PacketPtr packet) {
 		packet = std::make_shared<Packet>(req.c_str(), req.size());
 	}*/
 
-	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
+	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
+		wsa_print_err();
+		return 1;
+	}
 
 	sendedPackets.push_back(packet);
 
@@ -201,14 +207,14 @@ int ConnectedClient::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket"  << endl;
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket" << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket:" << WSAGetLastError() << endl;
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket:" << WSAGetLastError() << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket"  << endl;
-	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket" << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket:" << WSAGetLastError() << endl;
+	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket:" << WSAGetLastError() << endl;
 
 	cout << "Connected client " << ID << " was stopped" << endl;
 

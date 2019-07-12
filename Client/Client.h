@@ -15,19 +15,18 @@ enum class ERROR_TYPE : uint8_t {
 	CRITICAL_ERROR // Критическая ошибка
 };
 
-enum class CLIENT_STATE : uint8_t {
-	OK = 0,
-	INIT_WINSOCK,
-	CREATE_READ_SOCKET,
-	CREATE_WRITE_SOCKET,
-	SEND,
-	SHUTDOWN,
-	RECEIVE,
-	CLOSE_SOCKET
+enum class ClientState : uint8_t {
+	InitWinSock,
+	CreateReadSocket,
+	CreateWriteSocket,
+	Send,
+	Shutdown,
+	Receive,
+	CloseSockets
 };
 
 struct Packet {
-	Packet(const char* data = nullptr, size_t size = 0, bool needACK = false);
+	Packet(const char* data, size_t size, bool needACK);
 	~Packet();
 	char* data;
 	size_t size;
@@ -36,12 +35,17 @@ struct Packet {
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
+std::ostream& operator<< (std::ostream& os, const Packet& val);
+
+// Print WSA errors
+void __wsa_print_err(const char* file, uint16_t line);
+
+#define wsa_print_err() __wsa_print_err(__FILE__, __LINE__)
+
 class Client {
 public:
 	Client(PCSTR IP, uint16_t readPort, uint16_t writePort);
 	~Client();
-
-	int error_code;
 
 	std::vector<PacketPtr> receivedPackets;
 	std::vector<PacketPtr> sendedPackets;
@@ -58,8 +62,8 @@ public:
 private:
 	void createThreads();
 
-	int handleACK(PacketPtr packet);
-	int handleAll(PacketPtr packet);
+	int ack_handler(PacketPtr packet);
+	int any_packet_handler(PacketPtr packet);
 
 	int handlePacketIn(std::function<int(PacketPtr)>handler);
 	int handlePacketOut(PacketPtr packet);
@@ -67,12 +71,12 @@ private:
 	void receiverThread();
 	void senderThread();
 
-	void setState(CLIENT_STATE state);
+	void setState(ClientState state);
 
 	std::thread receiver;
 	std::thread sender;
 
-	CLIENT_STATE state;
+	ClientState state;
 
 	PCSTR IP;
 

@@ -11,7 +11,7 @@ int start() {
 	auto client = std::make_unique<Client>(SERVER_IP, READ_PORT, WRITE_PORT);
 
 	if (client->init())       return 1;
-	if (client->disconnect()) return 4;
+	if (client->disconnect()) return 2;
 
 	return 0;
 }

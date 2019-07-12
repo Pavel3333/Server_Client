@@ -5,7 +5,6 @@
 
 
 enum class ServerState {
-	Ok = 0, // bad state, need to remove
 	InitWinSock,
 	GetAddr, // unused now
 	CreateSocket,
@@ -24,6 +23,8 @@ public:
 	Server(USHORT port);
 	~Server();
 
+	bool started;
+
 	std::map<uint32_t, ConnectedClientPtr> clientPool;
 
 	int startServer();
@@ -38,12 +39,9 @@ private:
 
 	std::thread handler;
 
-	bool server_started;
 	ServerState state;
 
 	uint16_t port;
 
 	SOCKET connectSocket;
-
-	struct addrinfo* socketDesc;
 };
