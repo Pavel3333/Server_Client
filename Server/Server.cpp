@@ -137,7 +137,7 @@ int Server::initSockets() {
 	setState(ServerState::CreateWriteSocket);
 
 	listeningWriteSocket = initSocket(writePort);
-	if (listeningWriteSocket)
+	if (listeningWriteSocket == INVALID_SOCKET)
 		return 1;
 
 	log("The server can accept clients on the port %d", writePort);
