@@ -39,11 +39,11 @@ int Server::startServer()
 	log_raw("The server is running");
 
 	started = true;
-
-	handlerFirstHandshakes = std::thread(&Server::handleFirstHandshakes, this);
+	
+	handlerFirstHandshakes = std::thread(&Server::handleNewClients, this, true);
 	handlerFirstHandshakes.detach();
 
-	handlerSecondHandshakes = std::thread(&Server::handlerSecondHandshakes, this);
+	handlerSecondHandshakes = std::thread(&Server::handleNewClients, this, false);
 	handlerSecondHandshakes.detach();
 
 	return 0;
@@ -147,8 +147,16 @@ int Server::initSockets() {
 	return 0;
 }
 
-void Server::handleFirstHandshakes() //TODO: объединить в одну функцию, части по хэндшейкам вынести в отдельные функции
+void Server::handleNewClients(bool isReadSocket)
 {
+	uint16_t port = readPort;
+	SOCKET socket = listeningReadSocket;
+
+	if (!isReadSocket) {
+		port = writePort;
+		socket = listeningWriteSocket;
+	}
+
 	sockaddr_in clientDesc;
 	int clientLen = sizeof(clientDesc);
 
@@ -157,9 +165,9 @@ void Server::handleFirstHandshakes() //TODO: объединить в одну ф
 	uint16_t clientID = 0;
 
 	while (started && clientPool.size() < 10) {
-		log("Wait for client on port %d...", readPort);
+		log("Wait for client on port %d...", port);
 
-		SOCKET clientSocket = accept(listeningReadSocket, (sockaddr*)&clientDesc, &clientLen);
+		SOCKET clientSocket = accept(socket, (sockaddr*)&clientDesc, &clientLen);
 		if (clientSocket == INVALID_SOCKET)
 			continue;
 
@@ -170,7 +178,7 @@ void Server::handleFirstHandshakes() //TODO: объединить в одну ф
 
 		// Получаем итератор
 		auto client_it = clientPool.find(client_ip);
-		if (client_it == end(clientPool)) {
+		if (client_it == end(clientPool) && isReadSocket) {
 			// Такого клиента нет, добавить и начать рукопожатие
 			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
 
@@ -179,44 +187,16 @@ void Server::handleFirstHandshakes() //TODO: объединить в одну ф
 			if (client->first_handshake(clientSocket))
 				log("Error while first handshaking. Client ID: %d", client->getID());
 		}
-	}
-
-	if(clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
-}
-
-void Server::handleSecondHandshakes() //TODO: объединить в одну функцию, части по хэндшейкам вынести в отдельные функции
-{
-	sockaddr_in clientDesc;
-	int clientLen = sizeof(clientDesc);
-
-	// 10 clients limit
-
-	uint16_t clientID = 0;
-
-	while (started && clientPool.size() < 10) {
-		log("Wait for client on port %d...", writePort);
-
-		SOCKET clientSocket = accept(listeningWriteSocket, (sockaddr*)&clientDesc, &clientLen);
-		if (clientSocket == INVALID_SOCKET)
-			continue;
-
-		// Connected to client
-		setState(ServerState::Connect);
-
-		uint32_t client_ip = clientDesc.sin_addr.s_addr;
-
-		// Получаем итератор
-		auto client_it = clientPool.find(client_ip);
-		if (client_it != end(clientPool)) {
+		else {
+			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 
-			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			if (client.second_handshake(clientSocket))
 				log("Error while second handshaking. Client ID: %d", client.getID());
 		}
 	}
 
-	if (clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
+	if(clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
 }
 
 
