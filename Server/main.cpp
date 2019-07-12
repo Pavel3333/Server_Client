@@ -24,8 +24,6 @@ int start()
 			if (server.closeServer())
 				return 2;
 		}
-
-		Sleep(1000);
 	}
 
 	return 0;
