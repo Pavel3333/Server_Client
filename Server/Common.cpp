@@ -58,4 +58,17 @@ Packet::~Packet() { delete[] this->data; }
 //}
 
 
-void __wsa_print_err(const char* file, uint32_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }
+void __wsa_print_err(const char* file, int line)
+{
+	// mutex here?
+
+	int err = WSAGetLastError();
+
+	char err_msg[256] = "";
+	FormatMessageA(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
+		err_msg, sizeof(err_msg), NULL);
+
+	log("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
+}
