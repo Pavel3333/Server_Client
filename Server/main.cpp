@@ -3,19 +3,20 @@
 
 #include <string>
 
-constexpr uint16_t DEFAULT_PORT = 27010;
+constexpr uint16_t READ_PORT  = 27010;
+constexpr uint16_t WRITE_PORT = 27011;
 
 
 int start()
 {
-	Server server { DEFAULT_PORT };
+	Server server { READ_PORT, WRITE_PORT };
 
 	if (server.startServer())
 		return 1;
 
 	 log_raw("You can use these commands to manage the server:\n  \"close\" -> Close the server");
 
-	while (server.started) { // Прием команд из командной строки
+	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
 
 		std::cin >> cmd;

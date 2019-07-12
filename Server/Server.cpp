@@ -2,9 +2,11 @@
 #include "Server.h"
 
 
-Server::Server(USHORT port)
-    : connectSocket(INVALID_SOCKET)
-	, port(port)
+Server::Server(uint16_t readPort, uint16_t writePort)
+    : listeningReadSocket(INVALID_SOCKET)
+	, listeningWriteSocket(INVALID_SOCKET)
+	, readPort(readPort)
+	, writePort(writePort)
 	, started(false)
 {
 }
@@ -16,6 +18,8 @@ Server::~Server()
 		closeServer();
 }
 
+
+bool Server::isRunning() { return this->started; }
 
 int Server::startServer()
 {
@@ -30,14 +34,66 @@ int Server::startServer()
 		return 1;
 	}
 
-	// Create a SOCKET for connecting to clients (UDP protocol)
-	setState(ServerState::CreateSocket);
+	if (err = initSockets()) return err;
 
-	// connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); - у меня не работает
-	connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (connectSocket == INVALID_SOCKET) {
+	log_raw("The server is running");
+
+	started = true;
+
+	handlerFirstHandshakes = std::thread(&Server::handleFirstHandshakes, this);
+	handlerFirstHandshakes.detach();
+
+	handlerSecondHandshakes = std::thread(&Server::handlerSecondHandshakes, this);
+	handlerSecondHandshakes.detach();
+
+	return 0;
+}
+
+int Server::closeServer()
+{
+	if (!started)
+		return 0;
+
+	started = false;
+
+	// Closing handler threads
+
+	if (handlerFirstHandshakes.joinable())
+		handlerFirstHandshakes.join();
+
+	if (handlerSecondHandshakes.joinable())
+		handlerSecondHandshakes.join();
+
+	// Close the socket
+	setState(ServerState::CloseSockets);
+
+	if (listeningReadSocket != INVALID_SOCKET) {
+		int err = closesocket(listeningReadSocket);
+		if (err == SOCKET_ERROR)
+			log("Error while closing socket: %d", WSAGetLastError());
+	}
+
+	if (listeningWriteSocket != INVALID_SOCKET) {
+		int err = closesocket(listeningWriteSocket);
+		if (err == SOCKET_ERROR)
+			log("Error while closing socket: %d", WSAGetLastError());
+	}
+
+	WSACleanup();
+
+	log_raw("The server was stopped");
+
+	return 0;
+}
+
+SOCKET Server::initSocket(uint16_t port) {
+	SOCKET result = INVALID_SOCKET;
+
+	// result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); - у меня не работает
+	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (result == INVALID_SOCKET) {
 		wsa_print_err();
-		return 2;
+		return INVALID_SOCKET;
 	}
 
 	// Bind the socket
@@ -49,87 +105,47 @@ int Server::startServer()
 	hint.sin_port = htons(port);
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	err = bind(connectSocket, (sockaddr*)&hint, sizeof(hint));
+	int err = bind(result, (sockaddr*)&hint, sizeof(hint));
 	if (err == SOCKET_ERROR) {
 		wsa_print_err();
-		return 1;
+		return INVALID_SOCKET;
 	}
 
 	// Listening the port
 	setState(ServerState::Listen);
 
-	err = listen(connectSocket, SOMAXCONN);
+	err = listen(result, SOMAXCONN);
 	if (err == SOCKET_ERROR) {
 		wsa_print_err();
-		return 1;
+		return INVALID_SOCKET;
 	}
 
-	log_raw("The server is running");
+	return result;
+}
+
+int Server::initSockets() {
+	// Create a read socket that receiving data from server (UDP protocol)
+	setState(ServerState::CreateReadSocket);
+
+	listeningReadSocket = initSocket(readPort);
+	if (listeningReadSocket == INVALID_SOCKET) return 1;
+
+	log("The server can accept clients on the port %d", readPort);
+
+	// Create a write socket that sending data to the server (UDP protocol)
+	setState(ServerState::CreateWriteSocket);
+
+	listeningWriteSocket = initSocket(writePort);
+	if (listeningWriteSocket) return 1;
+
+	log("The server can accept clients on the port %d", writePort);
 
 	started = true;
 
-	handler = std::thread(&Server::handleRequests, this);
-	handler.detach(); //join(); // accept в потоке очень странно себя ведет, пока join
-
 	return 0;
 }
 
-
-int Server::closeServer()
-{
-	if (!started)
-		return 0;
-
-	started = false;
-
-	if(handler.joinable())
-		handler.join();
-
-	// Close the socket
-	setState(ServerState::CloseSocket);
-
-	int err = closesocket(connectSocket);
-	if (err == SOCKET_ERROR)
-		log("Error while closing socket: %d", WSAGetLastError());
-
-	WSACleanup();
-
-	log_raw("The server was stopped");
-
-	return 0;
-}
-
-
-// Первое рукопожатие с соединенным клиентом
-int Server::first_handshake(ConnectedClient& client, SOCKET socket)
-{
-	// Присвоить сокет на запись
-	setState(ServerState::FirstHandshake);
-
-	client.writeSocket = socket;
-
-	return 0;
-}
-
-
-// Второе рукопожатие с соединенным клиентом
-int Server::second_handshake(ConnectedClient& client, SOCKET socket)
-{
-	// Присвоить сокет на чтение
-	// Создать потоки-обработчики
-	// Отправить пакет ACK, подтвердить получение
-	setState(ServerState::SecondHandshake);
-
-	client.readSocket = socket;
-	client.started    = true;
-	client.createThreads();
-
-	//TODO: Отправить пакет ACK, подтвердить получение
-
-	return 0;
-}
-
-void Server::handleRequests()
+void Server::handleFirstHandshakes() //TODO: объединить в одну функцию, части по хэндшейкам вынести в отдельные функции
 {
 	sockaddr_in clientDesc;
 	int clientLen = sizeof(clientDesc);
@@ -139,9 +155,9 @@ void Server::handleRequests()
 	uint16_t clientID = 0;
 
 	while (started && clientPool.size() < 10) {
-		 log_raw("Wait for client...");
+		log("Wait for client on port %d...", readPort);
 
-		SOCKET clientSocket = accept(connectSocket, (sockaddr*)&clientDesc, &clientLen);
+		SOCKET clientSocket = accept(listeningReadSocket, (sockaddr*)&clientDesc, &clientLen);
 		if (clientSocket == INVALID_SOCKET)
 			continue;
 
@@ -150,28 +166,55 @@ void Server::handleRequests()
 
 		uint32_t client_ip = clientDesc.sin_addr.s_addr;
 
-		// получаем итератор
+		// Получаем итератор
 		auto client_it = clientPool.find(client_ip);
-		if (client_it != end(clientPool)) {
-			ConnectedClient& client = *(client_it->second);
-
-			// Уже есть клиент с таким же IP, продолжить рукопожатие
-			if (second_handshake(client, clientSocket)) {
-				log("Error while second handshaking. Client ID: %d", client.ID);
-			}
-		}
-		else {
+		if (client_it == end(clientPool)) {
 			// Такого клиента нет, добавить и начать рукопожатие
 			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
 
 			clientPool[client_ip] = client;
 
-			if (first_handshake(*client, clientSocket))
-				log("Error while first handshaking. Client ID: %d", client->ID);
+			if (client->first_handshake(clientSocket))
+				log("Error while first handshaking. Client ID: %d", client->getID());
 		}
 	}
 
 	if(clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
+}
+
+void Server::handleSecondHandshakes() //TODO: объединить в одну функцию, части по хэндшейкам вынести в отдельные функции
+{
+	sockaddr_in clientDesc;
+	int clientLen = sizeof(clientDesc);
+
+	// 10 clients limit
+
+	uint16_t clientID = 0;
+
+	while (started && clientPool.size() < 10) {
+		log("Wait for client on port %d...", writePort);
+
+		SOCKET clientSocket = accept(listeningWriteSocket, (sockaddr*)&clientDesc, &clientLen);
+		if (clientSocket == INVALID_SOCKET)
+			continue;
+
+		// Connected to client
+		setState(ServerState::Connect);
+
+		uint32_t client_ip = clientDesc.sin_addr.s_addr;
+
+		// Получаем итератор
+		auto client_it = clientPool.find(client_ip);
+		if (client_it != end(clientPool)) {
+			ConnectedClient& client = *(client_it->second);
+
+			// Уже есть клиент с таким же IP, продолжить рукопожатие
+			if (client.second_handshake(clientSocket))
+				log("Error while second handshaking. Client ID: %d", client.getID());
+		}
+	}
+
+	if (clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
 }
 
 
@@ -185,16 +228,13 @@ void Server::setState(ServerState state)
 	break;
 
 	switch (state) {
-		PRINT_STATE(Ok)
 		PRINT_STATE(InitWinSock)
-		PRINT_STATE(CreateSocket)
+		PRINT_STATE(CreateReadSocket)
+		PRINT_STATE(CreateWriteSocket)
 		PRINT_STATE(Bind)
 		PRINT_STATE(Listen)
 		PRINT_STATE(Connect)
-		PRINT_STATE(FirstHandshake)
-		PRINT_STATE(SecondHandshake)
-		PRINT_STATE(Shutdown)
-		PRINT_STATE(CloseSocket)
+		PRINT_STATE(CloseSockets)
 	default:
 		log("Unknown state: %d", (int)state);
 		return;

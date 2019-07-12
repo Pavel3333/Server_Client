@@ -6,12 +6,13 @@
 #include <memory>
 #include <functional>
 
-enum class CLIENT_STATE : uint8_t {
-	OK = 0,
-	SEND,
-	RECEIVE,
-	SHUTDOWN,
-	CLOSE_SOCKET
+enum class ClientState : uint8_t {
+	FirstHandshake,
+	SecondHandshake,
+	Send,
+	Receive,
+	Shutdown,
+	CloseSockets
 };
 
 class ConnectedClient {
@@ -19,14 +20,21 @@ public:
 	ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int clientLen);
 	~ConnectedClient();
 
-	uint16_t ID;
-	bool started;
-
 	std::vector<PacketPtr> receivedPackets;
 	std::vector<PacketPtr> sendedPackets;
 
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
+
+	bool isRunning();
+
+	uint16_t getID();
+
+	uint16_t getIP_u16();
+	char*    getIP_str();
+
+	int first_handshake(SOCKET socket);
+	int second_handshake(SOCKET socket);
 
 	void createThreads();
 
@@ -49,17 +57,19 @@ private:
 	void receiverThread();
 	void senderThread();
 
-	void setState(CLIENT_STATE state);
+	void setState(ClientState state);
 
 	std::thread receiver;
 	std::thread sender;
 
-	CLIENT_STATE state;
+	uint16_t ID;
+	uint32_t IP;
+	bool started;
+
+	ClientState state;
 
 	char IP_str[16];
 	char host[NI_MAXHOST];
-
-	unsigned long IP;
 
 	uint16_t port;
 };

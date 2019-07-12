@@ -63,12 +63,11 @@ public:
 	std::vector<PacketPtr> syncPackets;
 
 	int init();
-	int connect2server(uint16_t port);
-	int handshake();
-	int sendData(PacketPtr packet);
-	int receiveData(PacketPtr dest);
+	SOCKET connect2server(uint16_t port);
 	int disconnect();
 private:
+	int handshake();
+
 	void createThreads();
 
 	int ack_handler(PacketPtr packet);
@@ -79,6 +78,9 @@ private:
 
 	void receiverThread();
 	void senderThread();
+
+	int sendData(PacketPtr packet);
+	int receiveData(PacketPtr dest);
 
 	void setState(ClientState state);
 

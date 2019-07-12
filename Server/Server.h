@@ -6,42 +6,46 @@
 
 enum class ServerState {
 	InitWinSock,
-	GetAddr, // unused now
-	CreateSocket,
+	CreateReadSocket,
+	CreateWriteSocket,
 	Bind,
 	Listen,
 	Connect,
-	FirstHandshake,
-	SecondHandshake,
-	Shutdown,
-	CloseSocket
+	CloseSockets
 };
 
 
 class Server {
 public:
-	Server(USHORT port);
+	Server(uint16_t readPort, uint16_t writePort);
 	~Server();
 
-	bool started;
-
 	std::map<uint32_t, ConnectedClientPtr> clientPool;
+
+	bool isRunning();
 
 	int startServer();
 	int closeServer();
 
 private:
-	int first_handshake(ConnectedClient& client, SOCKET socket);
-	int second_handshake(ConnectedClient& client, SOCKET socket);
+	SOCKET initSocket(uint16_t port);
 
-	void handleRequests();
+	int initSockets();
+
+	void handleFirstHandshakes();
+	void handleSecondHandshakes();
 	void setState(ServerState state);
 
-	std::thread handler;
+	std::thread handlerFirstHandshakes;
+	std::thread handlerSecondHandshakes;
+
+	bool started;
 
 	ServerState state;
 
-	uint16_t port;
+	uint16_t readPort;
+	uint16_t writePort;
 
-	SOCKET connectSocket;
+	SOCKET listeningReadSocket;
+	SOCKET listeningWriteSocket;
 };

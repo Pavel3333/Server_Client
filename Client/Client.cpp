@@ -107,48 +107,53 @@ int Client::init() {
 	return 0;
 }
 
-int Client::connect2server(uint16_t port) {
+SOCKET Client::connect2server(uint16_t port) {
+	SOCKET result = INVALID_SOCKET;
+
 	sockaddr_in socketDesc;
 
 	socketDesc.sin_family = AF_INET;
 	socketDesc.sin_port = htons(port);
 	inet_pton(AF_INET, IP, &(socketDesc.sin_addr.s_addr));
 
-	readSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (readSocket == INVALID_SOCKET) {
+	//result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (result == INVALID_SOCKET) {
 		wsa_print_err();
-		return 1;
+		return INVALID_SOCKET;
 	}
 
 	// Connect to server
-	if (connect(readSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) {
+	if (connect(result, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) {
 		wsa_print_err();
-		return 2;
+		return INVALID_SOCKET;
 	}
 
-	return 0;
+	return result;
 }
 
 int Client::handshake() {
 	// Create a read socket that receiving data from server (UDP protocol)
 	setState(ClientState::CreateReadSocket);
 
-	if(connect2server(readPort)) return 1;
+	readSocket = connect2server(readPort);
+	if(readSocket == INVALID_SOCKET) return 1;
 
 	log("The client can read the data from the port %d", readPort);
 
 	// Create a write socket that sending data to the server (UDP protocol)
 	setState(ClientState::CreateWriteSocket);
 
-	if (connect2server(writePort)) return 1;
+	writeSocket = connect2server(writePort);
+	if (writeSocket == INVALID_SOCKET) return 1;
 
 	log("The client can write the data to the port %d", writePort);
 
 	//TODO: receive ACK from the server
 
-	createThreads();
-
 	started = true;
+
+	createThreads();
 
 	return 0;
 }
@@ -289,23 +294,40 @@ int Client::receiveData(PacketPtr dest) {
 int Client::disconnect() {
 	if (!started) return 0;
 
+	started = false;
+
+	// Closing handler threads
+
+	if (receiver.joinable())
+		receiver.join();
+
+	if (sender.joinable())
+		sender.join();
+
 	// Shutdown the connection since no more data will be sent
 	setState(ClientState::Shutdown);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning read socket: %d", WSAGetLastError());
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning write socket: %d", WSAGetLastError());
+	if (readSocket != INVALID_SOCKET)
+		if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR)
+			log("Error while shutdowning read socket: %d", WSAGetLastError());
+
+	if (writeSocket != INVALID_SOCKET)
+		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+			log("Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
 	setState(ClientState::CloseSockets);
+	if (readSocket != INVALID_SOCKET)
+		if (closesocket(readSocket)  == SOCKET_ERROR)
+			log("Error while closing read socket: %d", WSAGetLastError());
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) log("Error while closing read socket: %d", WSAGetLastError());
-	if (closesocket(writeSocket) == SOCKET_ERROR) log("Error while closing write socket: %d", WSAGetLastError());
+	if (writeSocket != INVALID_SOCKET)
+		if (closesocket(writeSocket) == SOCKET_ERROR)
+			log("Error while closing write socket: %d", WSAGetLastError());
 
 	WSACleanup();
 
 	log_raw("The client was stopped");
-
-	started = false;
 
 	return 0;
 }
@@ -320,14 +342,13 @@ void Client::setState(ClientState state)
 	break;
 
 	switch (state) {
-		PRINT_STATE(OK);
-		PRINT_STATE(INIT_WINSOCK);
-		PRINT_STATE(CREATE_READ_SOCKET);
-		PRINT_STATE(CREATE_WRITE_SOCKET);
-		PRINT_STATE(SEND);
-		PRINT_STATE(SHUTDOWN);
-		PRINT_STATE(RECEIVE);
-		PRINT_STATE(CLOSE_SOCKET);
+		PRINT_STATE(InitWinSock);
+		PRINT_STATE(CreateReadSocket);
+		PRINT_STATE(CreateWriteSocket);
+		PRINT_STATE(Send);
+		PRINT_STATE(Shutdown);
+		PRINT_STATE(Receive);
+		PRINT_STATE(CloseSockets);
 	default:
 		log("Unknown state: %d", (int)state);
 		return;

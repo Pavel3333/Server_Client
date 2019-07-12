@@ -18,8 +18,6 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
 	log("Client %d (IP: %s, host: %s) connected on port %d", ID, IP_str, host, port);
-
-	setState(CLIENT_STATE::OK);
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -38,6 +36,41 @@ ConnectedClient::~ConnectedClient() {
 
 		receivedPackets.clear();
 	}
+}
+
+
+bool     ConnectedClient::isRunning() { return this->started; }
+uint16_t ConnectedClient::getID()     { return this->ID; }
+uint16_t ConnectedClient::getIP_u16() { return this->IP; }
+char*    ConnectedClient::getIP_str() { return this->IP_str; }
+
+// Первое рукопожатие с соединенным клиентом
+int ConnectedClient::first_handshake(SOCKET socket)
+{
+	// Присвоить сокет на запись
+	setState(ClientState::FirstHandshake);
+
+	writeSocket = socket;
+
+	return 0;
+}
+
+
+// Второе рукопожатие с соединенным клиентом
+int ConnectedClient::second_handshake(SOCKET socket)
+{
+	// Присвоить сокет на чтение
+	// Создать потоки-обработчики
+	// Отправить пакет ACK, подтвердить получение
+	setState(ClientState::SecondHandshake);
+
+	readSocket = socket;
+	started = true;
+	createThreads();
+
+	//TODO: Отправить пакет ACK, подтвердить получение
+
+	return 0;
 }
 
 void ConnectedClient::createThreads()
@@ -151,7 +184,7 @@ void ConnectedClient::senderThread()
 int ConnectedClient::receiveData(PacketPtr& dest)
 {
 	// Receive until the peer closes the connection
-	setState(CLIENT_STATE::RECEIVE);
+	setState(ClientState::Receive);
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
@@ -169,13 +202,12 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 		return -1;
 	}
 
-	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
 int ConnectedClient::sendData(PacketPtr packet) {
 	// Send an initial buffer
-	setState(CLIENT_STATE::SEND);
+	setState(ClientState::Send);
 
 	/*if (!packet->data) { //Ввести данные
 		std::string req;
@@ -193,7 +225,6 @@ int ConnectedClient::sendData(PacketPtr packet) {
 
 	sendedPackets.push_back(packet);
 
-	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
@@ -211,26 +242,33 @@ int ConnectedClient::disconnect() {
 		sender.join();
 
 	// Shutdown the connection since no more data will be sent
-	setState(CLIENT_STATE::SHUTDOWN);
+	setState(ClientState::Shutdown);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning read socket: %d", WSAGetLastError());
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) log("Error while shutdowning write socket: %d", WSAGetLastError());
+	if (readSocket != INVALID_SOCKET)
+		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
+			log("Error while shutdowning read socket: %d", WSAGetLastError());
+
+	if (writeSocket != INVALID_SOCKET)
+		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+			log("Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
-	setState(CLIENT_STATE::CLOSE_SOCKET);
+	setState(ClientState::CloseSockets);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) log("Error while closing read socket: %d", WSAGetLastError());
-	if (closesocket(writeSocket) == SOCKET_ERROR) log("Error while closing write socket: %d", WSAGetLastError());
+	if(readSocket != INVALID_SOCKET)
+		if (closesocket(readSocket) == SOCKET_ERROR)
+			log("Error while closing read socket: %d", WSAGetLastError());
+	
+	if (writeSocket != INVALID_SOCKET)
+		if (closesocket(writeSocket) == SOCKET_ERROR)
+			log("Error while closing write socket: %d", WSAGetLastError());
 
 	log("Connected client %d was stopped", ID);
 
-	started = false;
-
-	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
-void ConnectedClient::setState(CLIENT_STATE state)
+void ConnectedClient::setState(ClientState state)
 {
 #ifdef _DEBUG
 	const char* state_desc;
@@ -240,11 +278,12 @@ void ConnectedClient::setState(CLIENT_STATE state)
 	break;
 
 	switch (state) {
-		PRINT_STATE(OK);
-		PRINT_STATE(SEND);
-		PRINT_STATE(RECEIVE);
-		PRINT_STATE(SHUTDOWN);
-		PRINT_STATE(CLOSE_SOCKET);
+		PRINT_STATE(FirstHandshake);
+		PRINT_STATE(SecondHandshake);
+		PRINT_STATE(Send);
+		PRINT_STATE(Receive);
+		PRINT_STATE(Shutdown);
+		PRINT_STATE(CloseSockets);
 	default:
 		log("Unknown state: %d", (int)state);
 		return;
