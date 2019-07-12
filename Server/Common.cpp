@@ -7,7 +7,7 @@ Packet::Packet(const char* data, size_t size, bool needACK)
 	: needACK(needACK)
 	, size(size)
 {
-	this->data = new char[size + 1];
+	this->data = new char[size];
 	memcpy(this->data, data, size);
 
 #ifdef _DEBUG
