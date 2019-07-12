@@ -185,7 +185,6 @@ void Server::setState(ServerState state)
 	break;
 
 	switch (state) {
-		PRINT_STATE(Ok)
 		PRINT_STATE(InitWinSock)
 		PRINT_STATE(CreateSocket)
 		PRINT_STATE(Bind)

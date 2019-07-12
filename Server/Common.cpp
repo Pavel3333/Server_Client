@@ -58,4 +58,4 @@ Packet::~Packet() { delete[] this->data; }
 //}
 
 
-void __wsa_print_err(const char* file, uint16_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }
+void __wsa_print_err(const char* file, uint32_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }

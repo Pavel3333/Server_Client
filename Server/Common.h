@@ -25,6 +25,6 @@ typedef std::shared_ptr<Packet> PacketPtr;
 //std::ostream& operator<< (std::ostream& os, const Packet& val);
 
 // Print WSA errors
-void __wsa_print_err(const char* file, uint16_t line);
+void __wsa_print_err(const char* file, uint32_t line);
 
 #define wsa_print_err() __wsa_print_err(__FILE__, __LINE__)
