@@ -15,7 +15,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	cout << "Client (IP: " << IP_str << ", host: " << host << ") connected on port " << port << endl;
+	cout << "Client " << ID << " (IP: " << IP_str << ", host: " << host << ") connected on port " << port << endl;
 
 	setState(CLIENT_STATE::OK);
 }
@@ -48,6 +48,14 @@ void ConnectedClient::createThreads() {
 	receiver.detach();
 }
 
+int ConnectedClient::handle1(PacketPtr packet) { // Обработка пакета ACK
+	cout << packet->data << endl;
+}
+
+int ConnectedClient::handle2(PacketPtr packet) { // Обработка любого входящего пакета
+	cout << packet->data << endl;
+}
+
 int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // Обработка пакета из очереди
 	auto packet = std::make_shared<Packet>(); // TODO: сделать с этим что-нибудь
 
@@ -60,19 +68,11 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)>handler) { // �
 	return handler(packet);
 }
 
-int handle1(PacketPtr packet) { // Обработка пакета ACK
-	cout << packet->data << endl;
-}
-
-int handle2(PacketPtr packet) { // Обработка любого входящего пакета
-	cout << packet->data << endl;
-}
-
 int ConnectedClient::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
 	if (sendData(packet)) return 1;
 
 	if (packet->needACK) {
-		if (handlePacketIn(handle1)) return 2;
+		if (handlePacketIn(this->handle1)) return 2;  //FIX ME
 	}
 
 	return 0;
@@ -80,7 +80,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet) { // Обработка �
 
 void ConnectedClient::receiverThread() { // Поток обработки входящих пакетов
 	while (started) {
-		if (int err = handlePacketIn(handle2)) {
+		if (int err = handlePacketIn(this->handle2)) {  //FIX ME
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
 		}
@@ -171,16 +171,16 @@ int ConnectedClient::disconnect() {
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
-	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket"  << endl;
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket" << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket" << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket"  << endl;
 	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket" << endl;
 
-	cout << "Connected client was stopped" << endl;
+	cout << "Connected client " << ID << " was stopped" << endl;
 
 	started = false;
 

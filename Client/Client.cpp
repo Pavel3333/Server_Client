@@ -2,17 +2,16 @@
 
 #include "Client.h"
 
-Packet::Packet(const char* data, size_t size) {
-	if (!size) size = strnlen_s(data, NET_BUFFER_SIZE);
-
-	this->size = size;
-
+Packet::Packet(const char* data, size_t size, bool needACK)
+	: needACK(needACK)
+	, size(size)
+{
 	this->data = new char[size + 2];
 	memcpy(this->data, data, size);
 	this->data[size] = NULL; //NULL-terminator
 
 #ifdef _DEBUG
-	cout << "Packet: " << size << ", data: " << this->data << endl;
+	cout << "Packet: " << size << ", data: " << this->data << endl;;
 #endif
 }
 
@@ -21,17 +20,19 @@ Packet::~Packet() {
 }
 
 
-Client::Client(PCSTR IP, USHORT port)
-	: connectSocket(INVALID_SOCKET)
-	, port(port)
+Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
+	: readSocket(INVALID_SOCKET)
+	, writeSocket(INVALID_SOCKET)
+	, readPort(readPort)
+	, writePort(writePort)
 	, IP(IP)
-	, client_started(false)
+	, started(false)
 {
 	setState(CLIENT_STATE::OK);
 }
 
 Client::~Client() {
-	if (client_started) disconnect();
+	if (started) disconnect();
 
 	if (state > CLIENT_STATE::INIT_WINSOCK) error_code = WSAGetLastError();
 
@@ -50,54 +51,158 @@ Client::~Client() {
 	}
 }
 
-int Client::connect2server() {
+
+int Client::init() {
 	// Initialize Winsock
 	setState(CLIENT_STATE::INIT_WINSOCK);
 
+	WSADATA wsaData;
+
 	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) return 1;
 
-	// Create a SOCKET for connecting to server (TCP/IP protocol)
-	setState(CLIENT_STATE::CREATE_SOCKET);
-
-	connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (connectSocket == INVALID_SOCKET) return 1;
-
-	// The sockaddr_in structure specifies the address family,
-	// IP address, and port of the server to be connected to.
-
-	socketDesc.sin_family = AF_INET;
-	socketDesc.sin_port = htons(port);
-	inet_pton(AF_INET, IP, &socketDesc.sin_addr.s_addr);
-
-	// Connect to server.
-	setState(CLIENT_STATE::CONNECT);
-
-	if (connect(connectSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 1;
-
-	char addr_str[16];
-
-	if (!inet_ntop(AF_INET, &(socketDesc.sin_addr), addr_str, 32)) cout << "Cannot to get addr string of server IP" << endl;
-	else                                                           cout << "The client was connected to the server " << addr_str << ':' << ntohs(socketDesc.sin_port) << endl;
-
-	client_started = true;
+	if (int err = handshake()) return err;
 
 	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
-int Client::sendData() {
+int Client::connect2server(uint16_t port) {
+	sockaddr_in socketDesc;
+
+	socketDesc.sin_family = AF_INET;
+	socketDesc.sin_port = htons(port);
+	inet_pton(AF_INET, IP, &(socketDesc.sin_addr.s_addr));
+
+	readSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (readSocket == INVALID_SOCKET) return 1;
+
+	// Connect to server
+	if (connect(readSocket, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) return 2;
+
+	setState(CLIENT_STATE::OK);
+	return 0;
+}
+
+int Client::handshake() {
+	// Create a read socket that receiving data from server (UDP protocol)
+	setState(CLIENT_STATE::CREATE_READ_SOCKET);
+
+	if(connect2server(readPort)) return 1;
+
+	cout << "The client can read the data from the port " << readPort << endl;
+
+	// Create a write socket that sending data to the server (UDP protocol)
+	setState(CLIENT_STATE::CREATE_WRITE_SOCKET);
+
+	if (connect2server(writePort)) return 1;
+
+	cout << "The client can write the data to the port " << writePort << endl;
+
+	//TODO: receive ACK from the server
+
+	createThreads();
+
+	started = true;
+
+	setState(CLIENT_STATE::OK);
+	return 0;
+}
+
+void Client::createThreads() {
+	sender = std::thread(&Client::senderThread, this);
+	sender.detach();
+
+	receiver = std::thread(&Client::receiverThread, this);
+	receiver.detach();
+}
+
+int Client::handleACK(PacketPtr packet) { // Обработка пакета ACK
+	cout << packet->data << endl;
+}
+
+int Client::handleAll(PacketPtr packet) { // Обработка любого входящего пакета
+	cout << packet->data << endl;
+}
+
+int Client::handlePacketIn(std::function<int(PacketPtr)> handler) { // Обработка пакета из очереди
+	auto packet = std::make_shared<Packet>(); // TODO: сделать с этим что-нибудь
+
+	if (int err = receiveData(packet)) return err; // Произошла ошибка
+
+	// Добавить пакет
+	receivedPackets.push_back(packet);
+
+	// Обработка пришедшего пакета
+	return handler(packet);
+}
+
+int Client::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
+	if (sendData(packet)) return 1;
+
+	if (packet->needACK) {
+		if (handlePacketIn(this->handleACK)) return 2; //FIX ME
+	}
+
+	return 0;
+}
+
+void Client::receiverThread() { // Поток обработки входящих пакетов
+	while (started) {
+		if (int err = handlePacketIn(this->handleAll)) {  //FIX ME
+			if (err > 0) break;    // Критическая ошибка или соединение сброшено
+			else         continue; // Неудачный пакет, продолжить прием        
+		}
+	}
+
+	// Закрываем поток
+	cout << "Closing receiver thread " << receiver.get_id() << endl;
+}
+
+void Client::senderThread() { // Поток отправки пакетов
+	while (started) {
+		// Обработать основные пакеты
+		while (!mainPackets.empty()) {
+			PacketPtr packet = mainPackets.back();
+
+			if (handlePacketOut(packet)) {
+				cout << "Packet not confirmed, adding to sync queue" << endl; // TODO: писать Packet ID
+				syncPackets.push_back(packet);
+			}
+
+			mainPackets.pop();
+		}
+
+		// Обработать пакеты, не подтвержденные сервером
+		auto packetIt = syncPackets.begin();
+		while (packetIt != syncPackets.end()) {
+			if (handlePacketOut(*packetIt)) {
+				cout << "Packet not confirmed" << endl; // TODO: писать Packet ID
+				packetIt++;
+			}
+			else packetIt = syncPackets.erase(packetIt);
+		}
+
+		Sleep(100);
+	}
+
+	// Закрываем поток
+	cout << "Closing sender thread " << sender.get_id() << endl;
+}
+
+int Client::sendData(PacketPtr packet) {
 	// Send an initial buffer
 	setState(CLIENT_STATE::SEND);
 
-	std::string req;
+	/*if (!packet->data) { //Ввести данные
+		std::string req;
 
-	cout << "Type what you want to send to server: " << endl << '>';
-	std::getline(std::cin, req);
+		cout << "Type what you want to send to client: " << endl << '>';
+		std::getline(std::cin, req);
 
-	auto packet = std::make_shared<Packet>((char*)req.c_str(), req.size());
+		packet = std::make_shared<Packet>(req.c_str(), req.size());
+	}*/
 
-	int bytesSent = send(connectSocket, packet->data, packet->size, 0);
-	if (bytesSent == SOCKET_ERROR) return 1;
+	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) return 1;
 
 	sendedPackets.push_back(packet);
 
@@ -105,52 +210,49 @@ int Client::sendData() {
 	return 0;
 }
 
-int Client::receiveData() {
+int Client::receiveData(PacketPtr dest) {
 	// Receive until the peer closes the connection
 	setState(CLIENT_STATE::RECEIVE);
 
-	char recBuff[NET_BUFFER_SIZE];
+	char respBuff[NET_BUFFER_SIZE];
 
-	int bytesRec;
-	size_t counter = 0;
+	int respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
 
-	do {
-		bytesRec = recv(connectSocket, recBuff, NET_BUFFER_SIZE, 0);
-		if (bytesRec > 0) { //Записываем данные от клиента (TODO: писать туда и ID клиента)
-			receivedPackets.push_back(std::make_shared<Packet>(recBuff, bytesRec));
-
-			if (sendData()) cout << "SEND - error: " << WSAGetLastError() << endl;
-
-			counter++;
-		}
-		else if (bytesRec == 0) cout << "Connection closed" << endl;
-		else
-			return 1;
+	if (respSize > 0) { //Записываем данные от сервера
+		dest->data = respBuff;
+		dest->size = respSize;
+		dest->needACK = false;
 	}
-	while (bytesRec > 0 && counter < 30);
+	else if (!respSize) {
+		cout << "Connection closed" << endl;
+		return 1;
+	}
+	else return -1;
 
 	setState(CLIENT_STATE::OK);
 	return 0;
 }
 
 int Client::disconnect() {
-	if (!client_started) return 0;
+	if (!started) return 0;
 
 	// Shutdown the connection since no more data will be sent
 	setState(CLIENT_STATE::SHUTDOWN);
 
-	if (shutdown(connectSocket, SD_SEND) == SOCKET_ERROR) cout << "Error while shutdowning connection" << endl;
+	if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning read socket"  << endl;
+	if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR) cout << "Error while shutdowning write socket" << endl;
 
 	// Close the socket
 	setState(CLIENT_STATE::CLOSE_SOCKET);
 
-	if (closesocket(connectSocket) == SOCKET_ERROR) cout << "Error while closing socket" << endl;
+	if (closesocket(readSocket)  == SOCKET_ERROR) cout << "Error while closing read socket" << endl;
+	if (closesocket(writeSocket) == SOCKET_ERROR) cout << "Error while closing write socket" << endl;
 
 	WSACleanup();
 
 	cout << "The client was stopped" << endl;
 
-	client_started = false;
+	started = false;
 
 	setState(CLIENT_STATE::OK);
 	return 0;
@@ -166,8 +268,8 @@ void Client::setState(CLIENT_STATE state)
 	switch (state) {
 		PRINT_STATE(OK);
 		PRINT_STATE(INIT_WINSOCK);
-		PRINT_STATE(CREATE_SOCKET);
-		PRINT_STATE(CONNECT);
+		PRINT_STATE(CREATE_READ_SOCKET);
+		PRINT_STATE(CREATE_WRITE_SOCKET);
 		PRINT_STATE(SEND);
 		PRINT_STATE(SHUTDOWN);
 		PRINT_STATE(RECEIVE);

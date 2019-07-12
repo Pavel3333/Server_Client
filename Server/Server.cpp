@@ -31,7 +31,7 @@ int Server::startServer()
 
 	if (error_code = WSAStartup(MAKEWORD(2, 2), &wsData)) return 1;
 
-	// Create a SOCKET for connecting to clients (TCP/IP protocol)
+	// Create a SOCKET for connecting to clients (UDP protocol)
 	setState(SERVER_STATE::CREATE_SOCKET);
 
 	connectSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -178,6 +178,8 @@ void Server::setState(SERVER_STATE state)
 		PRINT_STATE(BIND);
 		PRINT_STATE(LISTEN);
 		PRINT_STATE(CONNECT);
+		PRINT_STATE(HANDSHAKE_1);
+		PRINT_STATE(HANDSHAKE_2);
 		PRINT_STATE(SHUTDOWN);
 		PRINT_STATE(CLOSE_SOCKET);
 	default:

@@ -41,6 +41,9 @@ public:
 	SOCKET readSocket;
 	SOCKET writeSocket;
 private:
+	int handle1(PacketPtr packet);
+	int handle2(PacketPtr packet);
+
 	int handlePacketIn(std::function<int(PacketPtr)>handler);
 	int handlePacketOut(PacketPtr packet);
 

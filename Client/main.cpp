@@ -2,17 +2,16 @@
 
 #include "Client.h"
 
-constexpr uint16_t    DEFAULT_PORT = 27010;
-constexpr const char* SERVER_IP    = "127.0.0.1";
+constexpr uint16_t    READ_PORT  = 27010;
+constexpr uint16_t    WRITE_PORT = 27011;
+constexpr const char* SERVER_IP  = "127.0.0.1";
 
 
 int start() {
-	auto client = std::make_unique<Client>(SERVER_IP, DEFAULT_PORT);
+	auto client = std::make_unique<Client>(SERVER_IP, READ_PORT, WRITE_PORT);
 
-	if (client->connect2server()) return 1;
-	if (client->sendData())       return 2;
-	if (client->receiveData())    return 3;
-	if (client->disconnect())     return 4;
+	if (client->init())       return 1;
+	if (client->disconnect()) return 4;
 
 	return 0;
 }

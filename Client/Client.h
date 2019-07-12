@@ -2,6 +2,10 @@
 
 #include "pch.h"
 
+#include <queue>
+#include <thread>
+#include <functional>
+
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
 
 enum class ERROR_TYPE : uint8_t {
@@ -14,8 +18,8 @@ enum class ERROR_TYPE : uint8_t {
 enum class CLIENT_STATE : uint8_t {
 	OK = 0,
 	INIT_WINSOCK,
-	CREATE_SOCKET,
-	CONNECT,
+	CREATE_READ_SOCKET,
+	CREATE_WRITE_SOCKET,
 	SEND,
 	SHUTDOWN,
 	RECEIVE,
@@ -23,40 +27,60 @@ enum class CLIENT_STATE : uint8_t {
 };
 
 struct Packet {
-	Packet(const char* data, size_t size = 0);
+	Packet(const char* data = nullptr, size_t size = 0, bool needACK = false);
 	~Packet();
 	char* data;
 	size_t size;
+	bool needACK;
 };
+
+typedef std::shared_ptr<Packet> PacketPtr;
 
 class Client {
 public:
-	Client(PCSTR, USHORT);
+	Client(PCSTR IP, uint16_t readPort, uint16_t writePort);
 	~Client();
 
 	int error_code;
 
-	std::vector<std::shared_ptr<Packet>> receivedPackets;
-	std::vector<std::shared_ptr<Packet>> sendedPackets;
+	std::vector<PacketPtr> receivedPackets;
+	std::vector<PacketPtr> sendedPackets;
 
-	int connect2server();
-	int sendData();
-	int receiveData();
+	std::queue<PacketPtr> mainPackets;
+	std::vector<PacketPtr> syncPackets;
+
+	int init();
+	int connect2server(uint16_t port);
+	int handshake();
+	int sendData(PacketPtr packet);
+	int receiveData(PacketPtr dest);
 	int disconnect();
 private:
+	void createThreads();
+
+	int handleACK(PacketPtr packet);
+	int handleAll(PacketPtr packet);
+
+	int handlePacketIn(std::function<int(PacketPtr)>handler);
+	int handlePacketOut(PacketPtr packet);
+
+	void receiverThread();
+	void senderThread();
+
 	void setState(CLIENT_STATE state);
+
+	std::thread receiver;
+	std::thread sender;
 
 	CLIENT_STATE state;
 
 	PCSTR IP;
 
-	uint16_t port;
+	uint16_t readPort;
+	uint16_t writePort;
 
-	bool client_started;
+	bool started;
 
-	WSADATA wsaData;
-
-	SOCKET connectSocket;
-
-	struct sockaddr_in socketDesc;
+	SOCKET readSocket;
+	SOCKET writeSocket;
 };
