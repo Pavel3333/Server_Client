@@ -149,18 +149,12 @@ Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
 Client::~Client() {
 	if (started) disconnect();
 
-	if (!receivedPackets.empty()) {
-#ifdef _DEBUG
-		msg_mutex.lock();
-		cout << "All received data:" << endl;
-		size_t i = 1;
+	receivedPackets.clear();
+	sendedPackets.clear();
+	syncPackets.clear();
 
-		for (auto& it : receivedPackets) cout << i++ << ':' << endl << "  size: " << it->size << endl << "  data: " << it->data << endl;
-		msg_mutex.unlock();
-#endif
-
-		receivedPackets.clear();
-	}
+	while (!mainPackets.empty())
+		mainPackets.pop();
 }
 
 
@@ -181,6 +175,49 @@ int Client::init() {
 
 	return 0;
 }
+
+int Client::disconnect() {
+	if (!started)
+		return 0;
+
+	started = false;
+
+	// Closing handler threads
+
+	if (receiver.joinable())
+		receiver.join();
+
+	if (sender.joinable())
+		sender.join();
+
+	// Shutdown the connection since no more data will be sent
+	setState(ClientState::Shutdown);
+
+	if (readSocket != INVALID_SOCKET)
+		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning read socket: %d", WSAGetLastError());
+
+	if (writeSocket != INVALID_SOCKET)
+		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning write socket: %d", WSAGetLastError());
+
+	// Close the socket
+	setState(ClientState::CloseSockets);
+	if (readSocket != INVALID_SOCKET)
+		if (closesocket(readSocket) == SOCKET_ERROR)
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing read socket: %d", WSAGetLastError());
+
+	if (writeSocket != INVALID_SOCKET)
+		if (closesocket(writeSocket) == SOCKET_ERROR)
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing write socket: %d", WSAGetLastError());
+
+	WSACleanup();
+
+	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
+
+	return 0;
+}
+
 
 SOCKET Client::connect2server(uint16_t port) {
 	SOCKET result = INVALID_SOCKET;
@@ -267,10 +304,9 @@ int Client::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
 	if (sendData(packet))
 		return 1;
 
-	if (packet->needACK) {
+	if (packet->needACK)
 		if (handlePacketIn(std::bind(&Client::ack_handler, this, std::placeholders::_1)))
 			return 2;
-	}
 
 	return 0;
 }
@@ -287,7 +323,9 @@ void Client::receiverThread() { // Поток обработки входящих пакетов
 	}
 
 	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread %d", receiver.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread");
+
+	disconnect();
 }
 
 void Client::senderThread() { // Поток отправки пакетов
@@ -321,7 +359,7 @@ void Client::senderThread() { // Поток отправки пакетов
 	}
 
 	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread %d", sender.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread");
 }
 
 int Client::sendData(PacketPtr packet) {
@@ -365,55 +403,13 @@ int Client::receiveData(PacketPtr& dest)
 		receivedPackets.push_back(dest);
 	}
 	else if (!respSize) {
-		log_raw_colored(ConsoleColor::Info, "Connection closed");
-		return 1;
+		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+		return -1;
 	}
 	else {
 		wsa_print_err();
-		return -1;
+		return 1;
 	}
-
-	return 0;
-}
-
-int Client::disconnect() {
-	if (!started)
-		return 0;
-
-	started = false;
-
-	// Closing handler threads
-
-	if (receiver.joinable())
-		receiver.join();
-
-	if (sender.joinable())
-		sender.join();
-
-	// Shutdown the connection since no more data will be sent
-	setState(ClientState::Shutdown);
-
-	if (readSocket != INVALID_SOCKET)
-		if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning read socket: %d", WSAGetLastError());
-
-	if (writeSocket != INVALID_SOCKET)
-		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning write socket: %d", WSAGetLastError());
-
-	// Close the socket
-	setState(ClientState::CloseSockets);
-	if (readSocket != INVALID_SOCKET)
-		if (closesocket(readSocket)  == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing read socket: %d", WSAGetLastError());
-
-	if (writeSocket != INVALID_SOCKET)
-		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing write socket: %d", WSAGetLastError());
-
-	WSACleanup();
-
-	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 
 	return 0;
 }

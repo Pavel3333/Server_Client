@@ -17,6 +17,8 @@ Server::~Server()
 {
 	if (started)
 		closeServer();
+
+	clientPool.clear();
 }
 
 

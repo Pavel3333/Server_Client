@@ -26,18 +26,15 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
+	int first_handshake(SOCKET socket);
+	int second_handshake(SOCKET socket);
+
 	bool     isRunning() { return this->started; }
 	uint16_t getID()     { return this->ID; }
 	uint32_t getIP_u32() { return this->IP; }
 	char*    getIP_str() { return this->IP_str; }
 
-	int first_handshake(SOCKET socket);
-	int second_handshake(SOCKET socket);
-
-	void createThreads();
-
-	int receiveData(PacketPtr& dest);
-	int sendData(PacketPtr packet);
+	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
 	int disconnect();
 
@@ -55,6 +52,11 @@ private:
 	void receiverThread();
 	void senderThread();
 
+	void createThreads();
+
+	int receiveData(PacketPtr& dest);
+	int sendData(PacketPtr packet);
+
 	void setState(ClientState state);
 
 	std::thread receiver;
@@ -68,8 +70,6 @@ private:
 
 	char IP_str[16];
 	char host[NI_MAXHOST];
-
-	uint16_t port;
 };
 
 typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;

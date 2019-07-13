@@ -16,8 +16,8 @@ int start() {
 		return 1;
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
-	log_raw_colored(ConsoleColor::Info, "  \"close\" -> Close the client");
-	log_raw_colored(ConsoleColor::Info, "  \"send\"  -> Send the packet to server");
+	log_raw_colored(ConsoleColor::Info,            "  \"send\"  -> Send the packet to server");
+	log_raw_colored(ConsoleColor::Danger,          "  \"close\" -> Close the client");
 
 	while (client.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
@@ -29,11 +29,12 @@ int start() {
 				return 2;
 		}
 		else if (cmd == "send") {
-			log_raw_colored(ConsoleColor::Info, "Please type the word");
+			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
-			std::cin >> cmd;
+			std::cin.ignore();
+			std::getline(std::cin, cmd);
 
-			client.sendData(packetFactory.create(cmd.data(), cmd.size(), false));
+			client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
 		}
 	}
 
@@ -49,7 +50,7 @@ int main()
 		log_colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);
 
 	int v;
-	std::cin >> v; //Чтобы не закрывалось окно
+	std::cin >> v; // Чтобы не закрывалось окно
 
 	return 0;
 }
