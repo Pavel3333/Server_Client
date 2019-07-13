@@ -55,9 +55,9 @@ struct Packet {
 	Packet(uint32_t ID, const char* data, size_t size, bool needACK);
 	~Packet();
 	uint32_t ID;
-	char* data;
 	size_t size;
 	bool needACK;
+	char* data;
 };
 
 typedef std::shared_ptr<Packet> PacketPtr;
