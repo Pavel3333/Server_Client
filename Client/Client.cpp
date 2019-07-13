@@ -5,6 +5,7 @@
 
 
 std::mutex msg_mutex;
+static std::mutex pf_mutex;
 
 static void printThreadDesc() {
 	std::wstring threadDesc;
@@ -104,7 +105,13 @@ PacketFactory::PacketFactory()
 	: ID(0)
 {}
 
-PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK) { return std::make_shared<Packet>(this->ID++, data, size, needACK); }
+PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK)
+{
+	pf_mutex.lock();
+	PacketPtr result = std::make_shared<Packet>(this->ID++, data, size, needACK);
+	pf_mutex.unlock();
+	return result;
+}
 
 PacketFactory packetFactory;
 
