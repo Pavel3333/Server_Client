@@ -235,7 +235,8 @@ int ConnectedClient::sendData(PacketPtr packet) {
 }
 
 int ConnectedClient::disconnect() {
-	if (!started) return 0;
+	if (!started)
+		return 0;
 
 	started = false;
 

@@ -182,7 +182,8 @@ int Client::init() {
 		return 1;
 	}
 
-	if (err = handshake()) return err;
+	if (err = handshake())
+		return err;
 
 	return 0;
 }
@@ -217,7 +218,8 @@ int Client::handshake() {
 	setState(ClientState::CreateReadSocket);
 
 	readSocket = connect2server(readPort);
-	if(readSocket == INVALID_SOCKET) return 1;
+	if(readSocket == INVALID_SOCKET)
+		return 1;
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
@@ -225,7 +227,8 @@ int Client::handshake() {
 	setState(ClientState::CreateWriteSocket);
 
 	writeSocket = connect2server(writePort);
-	if (writeSocket == INVALID_SOCKET) return 1;
+	if (writeSocket == INVALID_SOCKET)
+		return 1;
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
@@ -247,19 +250,20 @@ void Client::createThreads() {
 }
 
 int Client::ack_handler(PacketPtr packet) { // Обработка пакета ACK
-	log_raw(packet->data);
+	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
 int Client::any_packet_handler(PacketPtr packet) { // Обработка любого входящего пакета
-	log_raw(packet->data);
+	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
 int Client::handlePacketIn(std::function<int(PacketPtr)> handler) { // Обработка пакета из очереди
 	PacketPtr packet;
 
-	if (int err = receiveData(packet)) return err; // Произошла ошибка
+	if (int err = receiveData(packet))
+		return err; // Произошла ошибка
 
 	// Добавить пакет
 	receivedPackets.push_back(packet);
@@ -269,7 +273,8 @@ int Client::handlePacketIn(std::function<int(PacketPtr)> handler) { // Обработка
 }
 
 int Client::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
-	if (sendData(packet)) return 1;
+	if (sendData(packet))
+		return 1;
 
 	if (packet->needACK) {
 		if (handlePacketIn(std::bind(&Client::ack_handler, this, std::placeholders::_1)))
@@ -377,7 +382,8 @@ int Client::receiveData(PacketPtr dest) {
 }
 
 int Client::disconnect() {
-	if (!started) return 0;
+	if (!started)
+		return 0;
 
 	started = false;
 

@@ -35,7 +35,8 @@ int Server::startServer()
 		return 1;
 	}
 
-	if (err = initSockets()) return err;
+	if (err = initSockets())
+		return err;
 
 	log_raw_colored(ConsoleColor::SuccessHighlighted, "The server is running");
 
