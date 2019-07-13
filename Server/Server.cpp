@@ -63,14 +63,14 @@ int Server::closeServer()
 
 	// Closing handler threads
 
-	if (cleaner.joinable())
-		cleaner.join();
-
 	if (firstHandshakesHandler.joinable())
 		firstHandshakesHandler.join();
 
 	if (secondHandshakesHandler.joinable())
 		secondHandshakesHandler.join();
+
+	if (cleaner.joinable())
+		cleaner.join();
 
 	// Close the socket
 	setState(ServerState::CloseSockets);
@@ -195,6 +195,9 @@ int Server::initSockets() {
 
 void Server::inactiveClientsCleaner() {
 	// Каждую секунду очищать неактивных клиентов
+
+	// Set thread description
+	setThreadDesc(L"Cleaner");
 
 	while (started) {
 		cleanInactiveClients();
