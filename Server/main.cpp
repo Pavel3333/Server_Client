@@ -16,10 +16,11 @@ int start()
 		return 1;
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
-	log_raw_colored(ConsoleColor::Info,            "  \"send\"  -> Send the packet to client");
-	log_raw_colored(ConsoleColor::Info,            "  \"save\"  -> Save all data into the file");
-	log_raw_colored(ConsoleColor::Info,            "  \"clean\" -> Clean all inactive users");
-	log_raw_colored(ConsoleColor::Danger,          "  \"close\" -> Close the server");
+	log_raw_colored(ConsoleColor::Info,            "  \"send\"     => Send the packet to client");
+	log_raw_colored(ConsoleColor::Info,            "  \"send_all\" => Send the packet to all clients");
+	log_raw_colored(ConsoleColor::Info,            "  \"save\"     => Save all data into the file");
+	log_raw_colored(ConsoleColor::Info,            "  \"clean\"    => Clean all inactive users");
+	log_raw_colored(ConsoleColor::Danger,          "  \"close\"    => Close the server");
 
 	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
@@ -51,6 +52,17 @@ int start()
 				std::getline(std::cin, cmd);
 
 				ConnectedClient& client = *(client_it->second);
+
+				client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
+			}
+		}
+		else if (cmd == "send_all") {
+			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+
+			std::getline(std::cin, cmd);
+
+			for (auto client_it : server.clientPool) {
+				ConnectedClient& client = *(client_it.second);
 
 				client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
 			}
