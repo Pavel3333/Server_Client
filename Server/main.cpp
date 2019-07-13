@@ -18,6 +18,7 @@ int start()
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
 	log_raw_colored(ConsoleColor::Info,            "  \"send\"  -> Send the packet to client");
 	log_raw_colored(ConsoleColor::Info,            "  \"save\"  -> Save all data into the file");
+	log_raw_colored(ConsoleColor::Info,            "  \"clean\" -> Clean all inactive users");
 	log_raw_colored(ConsoleColor::Danger,          "  \"close\" -> Close the server");
 
 	while (server.isRunning()) { // Прием команд из командной строки
@@ -124,6 +125,8 @@ int start()
 
 			log_colored(ConsoleColor::SuccessHighlighted, "Data successfully saved!");
 		}
+		else if (cmd == "clean")
+			server.cleanInactiveClients();
 	}
 
 	return 0;
