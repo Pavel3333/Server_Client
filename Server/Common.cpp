@@ -76,9 +76,10 @@ void log(const char* fmt, ...) {
 	msg_mutex.unlock();
 }
 
-Packet::Packet(const char* data, size_t size, bool needACK)
-	: needACK(needACK)
+Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
+	: ID(ID)
 	, size(size)
+	, needACK(needACK)
 {
 	this->data = new char[size];
 	memcpy(this->data, data, size);
@@ -96,6 +97,14 @@ Packet::~Packet() { delete[] this->data; }
 //	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
 //	return os;
 //}
+
+PacketFactory::PacketFactory()
+	: ID(0)
+{}
+
+PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK) { return std::make_shared<Packet>(this->ID++, data, size, needACK); }
+
+PacketFactory packetFactory;
 
 
 void __wsa_print_err(const char* file, int line)

@@ -163,7 +163,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
+				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->ID);
 				syncPackets.push_back(packet);
 			}
 			
@@ -174,7 +174,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_raw_colored(ConsoleColor::Warning, "Sync packet not confirmed"); // TODO: писать Packet ID
+				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->ID);
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -197,7 +197,7 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 
 	if (respSize > 0) {
 		//Записываем данные от клиента
-		dest = std::make_shared<Packet>(respBuff.data(), respSize, false);
+		dest = packetFactory.create(respBuff.data(), respSize, false);
 	}
 	else if (!respSize) {
 		log_raw_colored(ConsoleColor::Info, "Connection closed");
@@ -221,7 +221,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 		log_raw_nonl("Type what you want to send to client: \n>";
 		std::getline(std::cin, req);
 
-		packet = std::make_shared<Packet>(req.c_str(), req.size());
+		packet = packetFactory.create(req.c_str(), req.size(), false);
 	}*/
 
 	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {

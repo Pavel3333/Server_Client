@@ -30,8 +30,9 @@ void log_colored(ConsoleColor color, const char* fmt, ...);
 void log(const char* fmt, ...);
 
 struct Packet {
-	Packet(const char* data, size_t size, bool needACK);
+	Packet(uint32_t ID, const char* data, size_t size, bool needACK);
 	~Packet();
+	uint32_t ID;
 	char* data;
 	size_t size;
 	bool needACK;
@@ -40,6 +41,17 @@ struct Packet {
 typedef std::shared_ptr<Packet> PacketPtr;
 
 //std::ostream& operator<< (std::ostream& os, const Packet& val);
+
+class PacketFactory {
+public:
+	PacketFactory();
+	PacketPtr create(const char* data, size_t size, bool needACK);
+private:
+	uint32_t ID;
+};
+
+extern PacketFactory packetFactory;
+
 
 // Print WSA errors
 void __wsa_print_err(const char* file, int line);

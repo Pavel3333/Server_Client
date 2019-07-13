@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <array>
 #include <string_view>
 #include "Client.h"
 
@@ -77,16 +78,16 @@ void log(const char* fmt, ...) {
 	msg_mutex.unlock();
 }
 
-Packet::Packet(const char* data, size_t size, bool needACK)
-	: needACK(needACK)
+Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
+	: ID(ID)
 	, size(size)
+	, needACK(needACK)
 {
 	this->data = new char[size];
 	memcpy(this->data, data, size);
 
 #ifdef _DEBUG
 	log("Packet: %d bytes, data: %s", size, std::string_view(data, size));
-	//cout << *this << endl;
 #endif
 }
 
@@ -98,6 +99,14 @@ Packet::~Packet() { delete[] this->data; }
 //	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
 //	return os;
 //}
+
+PacketFactory::PacketFactory()
+	: ID(0)
+{}
+
+PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK) { return std::make_shared<Packet>(this->ID++, data, size, needACK); }
+
+PacketFactory packetFactory;
 
 
 void __wsa_print_err(const char* file, int line)
@@ -129,7 +138,9 @@ Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
 	, writePort(writePort)
 	, IP(IP)
 	, started(false)
-{}
+{
+	packetFactory = PacketFactory();
+}
 
 Client::~Client() {
 	if (started) disconnect();
@@ -285,7 +296,7 @@ void Client::senderThread() { // Поток отправки пакетов
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
+				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->ID);
 				syncPackets.push_back(packet);
 			}
 
@@ -296,7 +307,7 @@ void Client::senderThread() { // Поток отправки пакетов
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed");                       // TODO: писать Packet ID
+				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->ID);
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -320,7 +331,7 @@ int Client::sendData(PacketPtr packet) {
 
 		std::getline(std::cin, req);
 
-		packet = std::make_shared<Packet>(req.c_str(), req.size());
+		packet = packetFactory.create(req.c_str(), req.size(), false);
 	}*/
 
 	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
@@ -337,14 +348,13 @@ int Client::receiveData(PacketPtr dest) {
 	// Receive until the peer closes the connection
 	setState(ClientState::Receive);
 
-	char respBuff[NET_BUFFER_SIZE];
+	std::array<char, NET_BUFFER_SIZE> respBuff;
 
-	int respSize = recv(readSocket, respBuff, NET_BUFFER_SIZE, 0);
+	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 
-	if (respSize > 0) { //Записываем данные от сервера
-		dest->data = respBuff;
-		dest->size = respSize;
-		dest->needACK = false;
+	if (respSize > 0) {
+		//Записываем данные от сервера
+		dest = packetFactory.create(respBuff.data(), respSize, false);
 	}
 	else if (!respSize) {
 		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
