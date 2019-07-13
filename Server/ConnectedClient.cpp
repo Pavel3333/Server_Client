@@ -230,11 +230,11 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 	}
 	else if (!respSize) {
 		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
-		return -1;
+		return 1;
 	}
 	else {
 		wsa_print_err();
-		return 1;
+		return 2;
 	}
 
 	return 0;

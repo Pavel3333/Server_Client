@@ -76,7 +76,9 @@ extern PacketFactory packetFactory;
 
 
 // Print WSA errors
-#define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+const char* __get_filename(const char* file);
+
+#define __FILENAME__ __get_filename(__FILE__)
 
 void __wsa_print_err(const char* file, int line);
 

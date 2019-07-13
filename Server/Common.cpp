@@ -111,6 +111,11 @@ PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK)
 PacketFactory packetFactory;
 
 
+const char* __get_filename(const char* file) {
+	const char* last_slash = strrchr(file, '\\');
+	return last_slash ? last_slash + 1 : file;
+}
+
 void __wsa_print_err(const char* file, int line)
 {
 	msg_mutex.lock();

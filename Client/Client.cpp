@@ -113,6 +113,11 @@ PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK)
 PacketFactory packetFactory;
 
 
+const char* __get_filename(const char* file) {
+	const char* last_slash = strrchr(file, '\\');
+	return last_slash ? last_slash + 1 : file;
+}
+
 void __wsa_print_err(const char* file, int line)
 {
 	msg_mutex.lock();
@@ -404,11 +409,11 @@ int Client::receiveData(PacketPtr& dest)
 	}
 	else if (!respSize) {
 		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
-		return -1;
+		return 1;
 	}
 	else {
 		wsa_print_err();
-		return 1;
+		return 2;
 	}
 
 	return 0;
