@@ -40,10 +40,10 @@ int Server::startServer()
 
 	started = true;
 	
-	firstHandshakesHandler = std::thread(&Server::handleNewClients, this, true);
+	firstHandshakesHandler = std::thread(&Server::handleNewClients, this, false);
 	firstHandshakesHandler.detach();
 
-	secondHandshakesHandler = std::thread(&Server::handleNewClients, this, false);
+	secondHandshakesHandler = std::thread(&Server::handleNewClients, this, true);
 	secondHandshakesHandler.detach();
 
 	return 0;
@@ -179,9 +179,11 @@ void Server::handleNewClients(bool isReadSocket)
 
 		uint32_t client_ip = clientDesc.sin_addr.s_addr;
 
+		handshakes_mutex.lock();
+
 		// Получаем итератор
 		auto client_it = clientPool.find(client_ip);
-		if (isReadSocket && client_it == end(clientPool)) {
+		if (!isReadSocket && client_it == end(clientPool)) {
 			// Такого клиента нет, добавить и начать рукопожатие
 			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
 
@@ -190,13 +192,20 @@ void Server::handleNewClients(bool isReadSocket)
 			if (client->first_handshake(clientSocket))
 				log_colored(ConsoleColor::WarningHighlighted, "Error while first handshaking. Client ID: %d", client->getID());
 		}
-		else if (!isReadSocket && client_it != end(clientPool)) {
+		else if (isReadSocket && client_it != end(clientPool)) {
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 
 			if (client.second_handshake(clientSocket))
 				log_colored(ConsoleColor::WarningHighlighted, "Error while second handshaking. Client ID: %d", client.getID());
 		}
+		else {
+			// Ошибка, сбросить соединение
+			shutdown(clientSocket, SD_BOTH);
+			closesocket(clientSocket);
+		}
+
+		handshakes_mutex.unlock();
 	}
 
 	if(clientPool.size() == 10)  log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");

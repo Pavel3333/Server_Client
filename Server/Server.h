@@ -38,6 +38,8 @@ private:
 	std::thread firstHandshakesHandler;
 	std::thread secondHandshakesHandler;
 
+	std::mutex handshakes_mutex;
+
 	bool started;
 
 	ServerState state;

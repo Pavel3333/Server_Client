@@ -17,7 +17,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	log_colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected on port %d", ID, IP_str, host, port);
+	log_colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected!", ID, IP_str, host);
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -55,8 +55,8 @@ int ConnectedClient::first_handshake(SOCKET socket)
 int ConnectedClient::second_handshake(SOCKET socket)
 {
 	// Присвоить сокет на чтение
-	// Создать потоки-обработчики
 	// Отправить пакет ACK, подтвердить получение
+	// Создать потоки-обработчики
 	setState(ClientState::SecondHandshake);
 
 	readSocket = socket;
@@ -70,11 +70,11 @@ int ConnectedClient::second_handshake(SOCKET socket)
 
 void ConnectedClient::createThreads()
 {
-	sender = std::thread(&ConnectedClient::senderThread, this);
-	sender.detach();
-
 	receiver = std::thread(&ConnectedClient::receiverThread, this);
 	receiver.detach();
+
+	sender = std::thread(&ConnectedClient::senderThread, this);
+	sender.detach();
 }
 
 

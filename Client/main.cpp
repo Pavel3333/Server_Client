@@ -17,6 +17,7 @@ int start() {
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
 	log_raw_colored(ConsoleColor::Info, "  \"close\" -> Close the client");
+	log_raw_colored(ConsoleColor::Info, "  \"send\"  -> Send the packet to server");
 
 	while (client.isRunning()) { // Прием команд из командной строки
 		std::string cmd;

@@ -236,11 +236,11 @@ int Client::handshake() {
 }
 
 void Client::createThreads() {
-	sender = std::thread(&Client::senderThread, this);
-	sender.detach();
-
 	receiver = std::thread(&Client::receiverThread, this);
 	receiver.detach();
+
+	sender = std::thread(&Client::senderThread, this);
+	sender.detach();
 }
 
 int Client::ack_handler(PacketPtr packet) { // Обработка пакета ACK

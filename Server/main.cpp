@@ -3,8 +3,8 @@
 
 #include <string>
 
-constexpr uint16_t READ_PORT  = 27010;
-constexpr uint16_t WRITE_PORT = 27011;
+constexpr uint16_t READ_PORT  = 27011;
+constexpr uint16_t WRITE_PORT = 27010;
 
 
 int start()
