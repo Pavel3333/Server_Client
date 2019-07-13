@@ -22,23 +22,29 @@ public:
 
 	std::map<uint32_t, ConnectedClientPtr> clientPool;
 
-	bool isRunning() { return this->started; }
-
 	int startServer();
 	int closeServer();
+
+	bool isRunning() { return this->started; }
+
+	size_t getActiveClientsCount();
+	void   cleanInactiveClients();
 
 private:
 	SOCKET initSocket(uint16_t port);
 
 	int initSockets();
 
+	void inactiveClientsCleaner();
 	void handleNewClients(bool isReadSocket);
 	void setState(ServerState state);
+
+	std::thread cleaner;
 
 	std::thread firstHandshakesHandler;
 	std::thread secondHandshakesHandler;
 
-	std::mutex handshakes_mutex;
+	std::mutex clients_mutex;
 
 	bool started;
 

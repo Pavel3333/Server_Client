@@ -41,12 +41,15 @@ int Server::startServer()
 	log_raw_colored(ConsoleColor::SuccessHighlighted, "The server is running");
 
 	started = true;
-	
+
 	firstHandshakesHandler = std::thread(&Server::handleNewClients, this, false);
 	firstHandshakesHandler.detach();
 
 	secondHandshakesHandler = std::thread(&Server::handleNewClients, this, true);
 	secondHandshakesHandler.detach();
+
+	cleaner = std::thread(&Server::inactiveClientsCleaner, this);
+	cleaner.detach();
 
 	return 0;
 }
@@ -59,6 +62,9 @@ int Server::closeServer()
 	started = false;
 
 	// Closing handler threads
+
+	if (cleaner.joinable())
+		cleaner.join();
 
 	if (firstHandshakesHandler.joinable())
 		firstHandshakesHandler.join();
@@ -87,6 +93,44 @@ int Server::closeServer()
 
 	return 0;
 }
+
+
+size_t Server::getActiveClientsCount() {
+	size_t counter = 0;
+
+	clients_mutex.lock();
+	for (auto client_it : clientPool) {
+		ConnectedClient& client = *(client_it.second);
+
+		if (client.isRunning()) counter++;
+	}
+	clients_mutex.unlock();
+
+	return counter;
+}
+
+void Server::cleanInactiveClients() {
+	size_t cleaned = 0;
+
+	clients_mutex.lock();
+
+	auto client_it = clientPool.begin();
+	while (client_it != clientPool.end()) {
+		ConnectedClient& client = *(client_it->second);
+
+		if (!client.isRunning()) {
+			client_it = clientPool.erase(client_it);
+			cleaned++;
+		}
+		else
+			client_it++;
+	}
+
+	clients_mutex.unlock();
+
+	if(cleaned) log_colored(ConsoleColor::InfoHighlighted, "Cleaned %d inactive clients", cleaned);
+}
+
 
 SOCKET Server::initSocket(uint16_t port) {
 	SOCKET result = INVALID_SOCKET;
@@ -149,10 +193,20 @@ int Server::initSockets() {
 	return 0;
 }
 
+void Server::inactiveClientsCleaner() {
+	// Каждую секунду очищать неактивных клиентов
+
+	while (started) {
+		cleanInactiveClients();
+
+		Sleep(1000);
+	}
+}
+
 void Server::handleNewClients(bool isReadSocket)
 {
 	// Set thread description
-	setThreadDesc(L"NCH"); //New Client Handler
+	setThreadDesc(L"NCH"); // New Client Handler
 
 	// Init local vars
 	uint16_t clientID = 0;
@@ -169,7 +223,13 @@ void Server::handleNewClients(bool isReadSocket)
 	int clientLen = sizeof(clientDesc);
 
 	// 10 clients limit
-	while (started && clientPool.size() < 10) {
+	while (started) {
+		if(getActiveClientsCount() > 10) {
+			log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
+			Sleep(10000);
+			continue;
+		}
+
 		log_colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
 
 		SOCKET clientSocket = accept(socket, (sockaddr*)&clientDesc, &clientLen);
@@ -181,7 +241,7 @@ void Server::handleNewClients(bool isReadSocket)
 
 		uint32_t client_ip = clientDesc.sin_addr.s_addr;
 
-		handshakes_mutex.lock();
+		clients_mutex.lock();
 
 		// Получаем итератор
 		auto client_it = clientPool.find(client_ip);
@@ -207,10 +267,11 @@ void Server::handleNewClients(bool isReadSocket)
 			closesocket(clientSocket);
 		}
 
-		handshakes_mutex.unlock();
+		clients_mutex.unlock();
 	}
 
-	if(clientPool.size() == 10)  log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
+	// Закрываем поток
+	log_colored(ConsoleColor::InfoHighlighted, "Closing NCH (New Clients Handler) thread");
 }
 
 
