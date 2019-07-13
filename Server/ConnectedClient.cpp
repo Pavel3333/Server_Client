@@ -248,6 +248,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 		std::string req;
 
 		log_raw_nonl("Type what you want to send to client: \n>";
+
 		std::getline(std::cin, req);
 
 		packet = packetFactory.create(req.c_str(), req.size(), false);

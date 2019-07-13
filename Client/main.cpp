@@ -23,6 +23,7 @@ int start() {
 		std::string cmd;
 
 		std::cin >> cmd;
+		std::cin.ignore();
 
 		if (cmd == "close") { // Закрытие клиента
 			if (client.disconnect())
@@ -31,7 +32,6 @@ int start() {
 		else if (cmd == "send") {
 			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
-			std::cin.ignore();
 			std::getline(std::cin, cmd);
 
 			client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));

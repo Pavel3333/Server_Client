@@ -24,15 +24,17 @@ int start()
 		std::string cmd;
 
 		std::cin >> cmd;
+		std::cin.ignore();
 
 		if      (cmd == "close") { // Закрытие сервера
 			if (server.closeServer())
 				return 2;
 		}
 		else if (cmd == "send") {
-			log_raw_colored(ConsoleColor::Info, "Please print the client IP");
+			log_raw_colored(ConsoleColor::Info, "Please type the client IP");
 
 			std::cin >> cmd;
+			std::cin.ignore();
 
 			IN_ADDR IP_struct;
 
@@ -45,7 +47,6 @@ int start()
 			else {
 				log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
-				std::cin.ignore();
 				std::getline(std::cin, cmd);
 
 				ConnectedClient& client = *(client_it->second);
@@ -136,7 +137,8 @@ int main()
 	if (int err = start())
 		log_colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
 
-	std::cin.get(); // Чтобы не закрывалось окно
+	int v;
+	std::cin >> v; // Чтобы не закрывалось окно
 
 	return 0;
 }
