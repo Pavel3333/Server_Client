@@ -28,10 +28,27 @@ enum class ClientState : uint8_t {
 
 extern std::mutex msg_mutex;
 
+enum class ConsoleColor : uint16_t {
+	// Тёмные цвета
+	Success = 2,
+	Info    = 3,
+	Danger  = 4,
+	Warning = 6,
+	Default = 7,
+	// Насыщенные цвета
+	SuccessHighlighted = 10,
+	InfoHighlighted    = 11,
+	DangerHighlighted  = 12,
+	WarningHighlighted = 14,
+	DefaultHighlighted = 15,
+};
+
 void log_raw_nonl(const char* str); // without new line
+void log_raw_colored(ConsoleColor color, const char* str);
 void log_raw(const char* str);
 
 void log_nonl(const char* fmt, ...); // without new line
+void log_colored(ConsoleColor color, const char* fmt, ...);
 void log(const char* fmt, ...);
 
 struct Packet {
@@ -47,7 +64,7 @@ typedef std::shared_ptr<Packet> PacketPtr;
 //std::ostream& operator<< (std::ostream& os, const Packet& val);
 
 // Print WSA errors
-void __wsa_print_err(const char* file, uint16_t line);
+void __wsa_print_err(const char* file, int line);
 
 #define wsa_print_err() __wsa_print_err(__FILE__, __LINE__)
 
@@ -68,10 +85,13 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
+	bool isRunning();
+
 	int init();
-	SOCKET connect2server(uint16_t port);
 	int disconnect();
 private:
+	SOCKET connect2server(uint16_t port);
+
 	int handshake();
 
 	void createThreads();

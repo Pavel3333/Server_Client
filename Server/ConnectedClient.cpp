@@ -17,7 +17,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	log("Client %d (IP: %s, host: %s) connected on port %d", ID, IP_str, host, port);
+	log_colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected on port %d", ID, IP_str, host, port);
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -147,7 +147,7 @@ void ConnectedClient::receiverThread()
 	}
 
 	// Закрываем поток
-	log("Closing receiver thread %d", receiver.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread %d", receiver.get_id());
 }
 
 
@@ -163,7 +163,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_raw("Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
+				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
 				syncPackets.push_back(packet);
 			}
 			
@@ -174,7 +174,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_raw("Packet not confirmed"); // TODO: писать Packet ID
+				log_raw_colored(ConsoleColor::Warning, "Sync packet not confirmed"); // TODO: писать Packet ID
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -184,7 +184,7 @@ void ConnectedClient::senderThread()
 	}
 
 	// Закрываем поток
-	log("Closing sender thread %d", sender.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread %d", sender.get_id());
 }
 
 int ConnectedClient::receiveData(PacketPtr& dest)
@@ -200,7 +200,7 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 		dest = std::make_shared<Packet>(respBuff.data(), respSize, false);
 	}
 	else if (!respSize) {
-		log_raw("Connection closed");
+		log_raw_colored(ConsoleColor::Info, "Connection closed");
 		return 1;
 	}
 	else {
@@ -252,24 +252,24 @@ int ConnectedClient::disconnect() {
 
 	if (readSocket != INVALID_SOCKET)
 		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
-			log("Error while shutdowning read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning read socket: %d", WSAGetLastError());
 
 	if (writeSocket != INVALID_SOCKET)
 		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log("Error while shutdowning write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
 	setState(ClientState::CloseSockets);
 
 	if(readSocket != INVALID_SOCKET)
 		if (closesocket(readSocket) == SOCKET_ERROR)
-			log("Error while closing read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing read socket: %d", WSAGetLastError());
 	
 	if (writeSocket != INVALID_SOCKET)
 		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log("Error while closing write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing write socket: %d", WSAGetLastError());
 
-	log("Connected client %d was stopped", ID);
+	log_colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
 
 	return 0;
 }
@@ -291,12 +291,12 @@ void ConnectedClient::setState(ClientState state)
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSockets);
 	default:
-		log("Unknown state: %d", (int)state);
+		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 }
 #undef PRINT_STATE
 
-	log("State changed to: %s", state_desc);
+	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

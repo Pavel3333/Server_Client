@@ -6,16 +6,32 @@
 std::mutex msg_mutex;
 
 static void printThreadDesc() {
-	wchar_t* threadDesc;
-	getThreadDesc(&threadDesc);
-	wprintf(L"[%s]", threadDesc);
+	std::wstring threadDesc;
+	threadDesc.reserve(32);
+
+	wchar_t* desc;
+	getThreadDesc(&desc);
+
+	wsprintfW(threadDesc.data(), L"[%s]", desc);
+	wprintf(L"%-11s", threadDesc.data());
 }
+
+static void setConsoleColor(ConsoleColor color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (uint16_t)color); }
 
 
 void log_raw_nonl(const char* str) {
 	msg_mutex.lock();
 	printThreadDesc();
 	cout << str;
+	msg_mutex.unlock();
+}
+
+void log_raw_colored(ConsoleColor color, const char* str) {
+	msg_mutex.lock();
+	printThreadDesc();
+	setConsoleColor(color);
+	cout << str << endl;
+	setConsoleColor(ConsoleColor::Default);
 	msg_mutex.unlock();
 }
 
@@ -34,6 +50,19 @@ void log_nonl(const char* fmt, ...) {
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
 	va_end(args);
+	msg_mutex.unlock();
+}
+
+void log_colored(ConsoleColor color, const char* fmt, ...) {
+	msg_mutex.lock();
+	printThreadDesc();
+	setConsoleColor(color);
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+	setConsoleColor(ConsoleColor::Default);
+	cout << endl;
 	msg_mutex.unlock();
 }
 
@@ -71,7 +100,20 @@ Packet::~Packet() { delete[] this->data; }
 //}
 
 
-void __wsa_print_err(const char* file, uint16_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }
+void __wsa_print_err(const char* file, int line)
+{
+	msg_mutex.lock();
+	int err = WSAGetLastError();
+
+	char err_msg[256] = "";
+	FormatMessageA(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
+		err_msg, sizeof(err_msg), NULL);
+
+	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
+	msg_mutex.unlock();
+}
 
 // Set description to current thread
 void setThreadDesc(const wchar_t* desc) { SetThreadDescription(GetCurrentThread(), desc); }
@@ -106,6 +148,8 @@ Client::~Client() {
 	}
 }
 
+
+bool Client::isRunning() { return this->started; }
 
 int Client::init() {
 	// Initialize Winsock
@@ -156,7 +200,7 @@ int Client::handshake() {
 	readSocket = connect2server(readPort);
 	if(readSocket == INVALID_SOCKET) return 1;
 
-	log("The client can read the data from the port %d", readPort);
+	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
 	// Create a write socket that sending data to the server (UDP protocol)
 	setState(ClientState::CreateWriteSocket);
@@ -164,7 +208,7 @@ int Client::handshake() {
 	writeSocket = connect2server(writePort);
 	if (writeSocket == INVALID_SOCKET) return 1;
 
-	log("The client can write the data to the port %d", writePort);
+	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
 	//TODO: receive ACK from the server
 
@@ -228,7 +272,7 @@ void Client::receiverThread() { // Поток обработки входящих пакетов
 	}
 
 	// Закрываем поток
-	log("Closing receiver thread %d", receiver.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread %d", receiver.get_id());
 }
 
 void Client::senderThread() { // Поток отправки пакетов
@@ -241,7 +285,7 @@ void Client::senderThread() { // Поток отправки пакетов
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_raw("Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
+				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed, adding to sync queue"); // TODO: писать Packet ID
 				syncPackets.push_back(packet);
 			}
 
@@ -252,7 +296,7 @@ void Client::senderThread() { // Поток отправки пакетов
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_raw("Packet not confirmed"); // TODO: писать Packet ID
+				log_raw_colored(ConsoleColor::Warning, "Packet not confirmed");                       // TODO: писать Packet ID
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -262,7 +306,7 @@ void Client::senderThread() { // Поток отправки пакетов
 	}
 
 	// Закрываем поток
-	log("Closing sender thread %d", sender.get_id());
+	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread %d", sender.get_id());
 }
 
 int Client::sendData(PacketPtr packet) {
@@ -303,7 +347,7 @@ int Client::receiveData(PacketPtr dest) {
 		dest->needACK = false;
 	}
 	else if (!respSize) {
-		log_raw("Connection closed");
+		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 		return 1;
 	}
 	else {
@@ -332,25 +376,25 @@ int Client::disconnect() {
 
 	if (readSocket != INVALID_SOCKET)
 		if (shutdown(readSocket,  SD_BOTH) == SOCKET_ERROR)
-			log("Error while shutdowning read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning read socket: %d", WSAGetLastError());
 
 	if (writeSocket != INVALID_SOCKET)
 		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log("Error while shutdowning write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning write socket: %d", WSAGetLastError());
 
 	// Close the socket
 	setState(ClientState::CloseSockets);
 	if (readSocket != INVALID_SOCKET)
 		if (closesocket(readSocket)  == SOCKET_ERROR)
-			log("Error while closing read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing read socket: %d", WSAGetLastError());
 
 	if (writeSocket != INVALID_SOCKET)
 		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log("Error while closing write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing write socket: %d", WSAGetLastError());
 
 	WSACleanup();
 
-	log_raw("The client was stopped");
+	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 
 	return 0;
 }
@@ -373,12 +417,12 @@ void Client::setState(ClientState state)
 		PRINT_STATE(Receive);
 		PRINT_STATE(CloseSockets);
 	default:
-		log("Unknown state: %d", (int)state);
+		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	log("State changed to: %s", state_desc);
+	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

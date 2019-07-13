@@ -36,7 +36,7 @@ int Server::startServer()
 
 	if (err = initSockets()) return err;
 
-	log_raw("The server is running");
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "The server is running");
 
 	started = true;
 	
@@ -70,18 +70,18 @@ int Server::closeServer()
 	if (listeningReadSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningReadSocket);
 		if (err == SOCKET_ERROR)
-			log("Error while closing socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing socket: %d", WSAGetLastError());
 	}
 
 	if (listeningWriteSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningWriteSocket);
 		if (err == SOCKET_ERROR)
-			log("Error while closing socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Error while closing socket: %d", WSAGetLastError());
 	}
 
 	WSACleanup();
 
-	log_raw("The server was stopped");
+	log_raw_colored(ConsoleColor::InfoHighlighted, "The server was stopped");
 
 	return 0;
 }
@@ -131,7 +131,7 @@ int Server::initSockets() {
 	if (listeningReadSocket == INVALID_SOCKET)
 		return 1;
 
-	log("The server can accept clients on the port %d", readPort);
+	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", readPort);
 
 	// Create a write socket that sending data to the server (UDP protocol)
 	setState(ServerState::CreateWriteSocket);
@@ -140,7 +140,7 @@ int Server::initSockets() {
 	if (listeningWriteSocket == INVALID_SOCKET)
 		return 1;
 
-	log("The server can accept clients on the port %d", writePort);
+	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", writePort);
 
 	started = true;
 
@@ -149,6 +149,9 @@ int Server::initSockets() {
 
 void Server::handleNewClients(bool isReadSocket)
 {
+	// Set thread description
+	setThreadDesc(L"NCH"); //New Client Handler
+
 	// Init local vars
 	uint16_t clientID = 0;
 
@@ -163,18 +166,9 @@ void Server::handleNewClients(bool isReadSocket)
 	sockaddr_in clientDesc;
 	int clientLen = sizeof(clientDesc);
 
-	// Set thread description
-	const wchar_t* fmt = L"NCH (%d)"; //New Client Handler on port %d
-	std::wstring buff;
-	buff.reserve(64);
-
-	wsprintf(buff.data(), fmt, port);
-
-	setThreadDesc(buff.data());
-
 	// 10 clients limit
 	while (started && clientPool.size() < 10) {
-		log("Wait for client on port %d...", port);
+		log_colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
 
 		SOCKET clientSocket = accept(socket, (sockaddr*)&clientDesc, &clientLen);
 		if (clientSocket == INVALID_SOCKET)
@@ -194,18 +188,18 @@ void Server::handleNewClients(bool isReadSocket)
 			clientPool[client_ip] = client;
 
 			if (client->first_handshake(clientSocket))
-				log("Error while first handshaking. Client ID: %d", client->getID());
+				log_colored(ConsoleColor::WarningHighlighted, "Error while first handshaking. Client ID: %d", client->getID());
 		}
 		else {
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 
 			if (client.second_handshake(clientSocket))
-				log("Error while second handshaking. Client ID: %d", client.getID());
+				log_colored(ConsoleColor::WarningHighlighted, "Error while second handshaking. Client ID: %d", client.getID());
 		}
 	}
 
-	if(clientPool.size() == 10)  log_raw("Client connections count limit exceeded");
+	if(clientPool.size() == 10)  log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
 }
 
 
@@ -227,12 +221,12 @@ void Server::setState(ServerState state)
 		PRINT_STATE(Connect)
 		PRINT_STATE(CloseSockets)
 	default:
-		log("Unknown state: %d", (int)state);
+		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	log("State changed to: %s", state_desc);
+	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

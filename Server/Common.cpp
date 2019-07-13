@@ -5,16 +5,32 @@
 std::mutex msg_mutex;
 
 static void printThreadDesc() {
-	wchar_t* threadDesc;
-	getThreadDesc(&threadDesc);
-	wprintf(L"[%s] ", threadDesc);
+	std::wstring threadDesc;
+	threadDesc.reserve(32);
+
+	wchar_t* desc;
+	getThreadDesc(&desc);
+
+	wsprintfW(threadDesc.data(), L"[%s]", desc);
+	wprintf(L"%-11s", threadDesc.data());
 }
+
+static void setConsoleColor(ConsoleColor color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (uint16_t)color); }
 
 
 void log_raw_nonl(const char* str) {
 	msg_mutex.lock();
 	printThreadDesc();
 	cout << str;
+	msg_mutex.unlock();
+}
+
+void log_raw_colored(ConsoleColor color, const char* str) {
+	msg_mutex.lock();
+	printThreadDesc();
+	setConsoleColor(color);
+	cout << str << endl;
+	setConsoleColor(ConsoleColor::Default);
 	msg_mutex.unlock();
 }
 
@@ -33,6 +49,19 @@ void log_nonl(const char* fmt, ...) {
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
 	va_end(args);
+	msg_mutex.unlock();
+}
+
+void log_colored(ConsoleColor color, const char* fmt, ...) {
+	msg_mutex.lock();
+	printThreadDesc();
+	setConsoleColor(color);
+	va_list args;
+	va_start(args, fmt);
+	vprintf_s(fmt, args);
+	va_end(args);
+	setConsoleColor(ConsoleColor::Default);
+	cout << endl;
 	msg_mutex.unlock();
 }
 

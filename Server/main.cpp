@@ -14,8 +14,8 @@ int start()
 	if (server.startServer())
 		return 1;
 
-	log_raw("You can use these commands to manage the server:\n"
-		    "  \"close\" -> Close the server");
+	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
+	log_raw_colored(ConsoleColor::Info,            "  \"close\" -> Close the server");
 
 	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
@@ -37,7 +37,7 @@ int main()
 	setThreadDesc(L"main");
 
 	if (int err = start())
-		log("Server creating failed - error: %d", err);
+		log_colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
 
 	std::cin.get(); //Чтобы не закрывалось окно
 
