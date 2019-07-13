@@ -27,6 +27,13 @@ int start() {
 			if (client.disconnect())
 				return 2;
 		}
+		else if (cmd == "send") {
+			log_raw_colored(ConsoleColor::Info, "Please type the word");
+
+			std::cin >> cmd;
+
+			client.sendData(packetFactory.create(cmd.data(), cmd.size(), false));
+		}
 	}
 
 	return 0;

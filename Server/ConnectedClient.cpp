@@ -39,11 +39,6 @@ ConnectedClient::~ConnectedClient() {
 }
 
 
-bool     ConnectedClient::isRunning() { return this->started; }
-uint16_t ConnectedClient::getID()     { return this->ID; }
-uint16_t ConnectedClient::getIP_u16() { return this->IP; }
-char*    ConnectedClient::getIP_str() { return this->IP_str; }
-
 // Первое рукопожатие с соединенным клиентом
 int ConnectedClient::first_handshake(SOCKET socket)
 {
@@ -107,9 +102,6 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
 	int err = receiveData(packet);
 	if (err)
 		return err; // Произошла ошибка
-
-	// Добавить пакет
-	receivedPackets.push_back(packet);
 
 	// Обработка пришедшего пакета
 	return handler(packet);
@@ -196,8 +188,11 @@ int ConnectedClient::receiveData(PacketPtr& dest)
 	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 
 	if (respSize > 0) {
-		//Записываем данные от клиента
+		// Записываем данные от клиента
 		dest = packetFactory.create(respBuff.data(), respSize, false);
+
+		// Добавить пакет
+		receivedPackets.push_back(dest);
 	}
 	else if (!respSize) {
 		log_raw_colored(ConsoleColor::Info, "Connection closed");
@@ -229,6 +224,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 		return 1;
 	}
 
+	// Добавить пакет
 	sendedPackets.push_back(packet);
 
 	return 0;

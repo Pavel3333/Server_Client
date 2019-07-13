@@ -22,7 +22,7 @@ public:
 
 	std::map<uint32_t, ConnectedClientPtr> clientPool;
 
-	bool isRunning();
+	bool isRunning() { return this->started; }
 
 	int startServer();
 	int closeServer();

@@ -20,8 +20,6 @@ Server::~Server()
 }
 
 
-bool Server::isRunning() { return this->started; }
-
 int Server::startServer()
 {
 	// Initialize Winsock

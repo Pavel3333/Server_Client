@@ -26,12 +26,10 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
-	bool isRunning();
-
-	uint16_t getID();
-
-	uint16_t getIP_u16();
-	char*    getIP_str();
+	bool     isRunning() { return this->started; }
+	uint16_t getID()     { return this->ID; }
+	uint32_t getIP_u32() { return this->IP; }
+	char*    getIP_str() { return this->IP_str; }
 
 	int first_handshake(SOCKET socket);
 	int second_handshake(SOCKET socket);

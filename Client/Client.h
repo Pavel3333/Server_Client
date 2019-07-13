@@ -97,9 +97,10 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
-	bool isRunning();
+	bool isRunning() { return this->started; }
 
 	int init();
+	int sendData(PacketPtr packet);
 	int disconnect();
 private:
 	SOCKET connect2server(uint16_t port);
@@ -117,8 +118,7 @@ private:
 	void receiverThread();
 	void senderThread();
 
-	int sendData(PacketPtr packet);
-	int receiveData(PacketPtr dest);
+	int receiveData(PacketPtr& dest);
 
 	void setState(ClientState state);
 

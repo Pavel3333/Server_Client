@@ -168,8 +168,6 @@ Client::~Client() {
 }
 
 
-bool Client::isRunning() { return this->started; }
-
 int Client::init() {
 	// Initialize Winsock
 	setState(ClientState::InitWinSock);
@@ -265,9 +263,6 @@ int Client::handlePacketIn(std::function<int(PacketPtr)> handler) { // Обработка
 	if (int err = receiveData(packet))
 		return err; // Произошла ошибка
 
-	// Добавить пакет
-	receivedPackets.push_back(packet);
-
 	// Обработка пришедшего пакета
 	return handler(packet);
 }
@@ -352,25 +347,29 @@ int Client::sendData(PacketPtr packet) {
 		return 1;
 	}
 
+	// Добавить пакет
 	sendedPackets.push_back(packet);
 
 	return 0;
 }
 
-int Client::receiveData(PacketPtr dest) {
+int Client::receiveData(PacketPtr& dest)
+{
 	// Receive until the peer closes the connection
 	setState(ClientState::Receive);
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
-
 	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 
 	if (respSize > 0) {
-		//Записываем данные от сервера
+		// Записываем данные от клиента
 		dest = packetFactory.create(respBuff.data(), respSize, false);
+
+		// Добавить пакет
+		receivedPackets.push_back(dest);
 	}
 	else if (!respSize) {
-		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+		log_raw_colored(ConsoleColor::Info, "Connection closed");
 		return 1;
 	}
 	else {
@@ -429,7 +428,7 @@ void Client::setState(ClientState state)
 	const char* state_desc;
 
 #define PRINT_STATE(X) case ClientState::X: \
-	state_desc = #X;                         \
+	state_desc = #X;                        \
 	break;
 
 	switch (state) {

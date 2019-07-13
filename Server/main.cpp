@@ -16,15 +16,39 @@ int start()
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
 	log_raw_colored(ConsoleColor::Info,            "  \"close\" -> Close the server");
+	log_raw_colored(ConsoleColor::Info,            "  \"send\"  -> Send the packet to client");
 
 	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
 
 		std::cin >> cmd;
 
-		if (cmd == "close") { // Закрытие сервера
+		if      (cmd == "close") { // Закрытие сервера
 			if (server.closeServer())
 				return 2;
+		}
+		else if (cmd == "send") {
+			log_raw_colored(ConsoleColor::Info, "Please print the client IP");
+
+			std::cin >> cmd;
+
+			IN_ADDR IP_struct;
+
+			inet_pton(AF_INET, cmd.data(), &IP_struct);
+
+			auto client_it = server.clientPool.find(IP_struct.s_addr);
+
+			if (client_it == end(server.clientPool))
+				log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!");// Клиент не найден
+			else {
+				log_raw_colored(ConsoleColor::Info, "Please type the word");
+
+				std::cin >> cmd;
+
+				ConnectedClient& client = *(client_it->second);
+
+				client.sendData(packetFactory.create(cmd.data(), cmd.size(), false));
+			}
 		}
 	}
 
