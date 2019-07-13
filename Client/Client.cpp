@@ -44,6 +44,13 @@ void log_raw(const char* str) {
 	msg_mutex.unlock();
 }
 
+void log_raw(std::string_view str) {
+	msg_mutex.lock();
+	printThreadDesc();
+	cout << str << endl;
+	msg_mutex.unlock();
+}
+
 
 void log_nonl(const char* fmt, ...) {
 	msg_mutex.lock();

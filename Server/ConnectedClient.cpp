@@ -86,7 +86,7 @@ void ConnectedClient::createThreads()
 // Обработка пакета ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw(packet->data);
+	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
@@ -94,7 +94,7 @@ int ConnectedClient::ack_handler(PacketPtr packet)
 // Обработка любого входящего пакета
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw(packet->data);
+	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 

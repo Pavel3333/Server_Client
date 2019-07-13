@@ -182,7 +182,7 @@ void Server::handleNewClients(bool isReadSocket)
 
 		// Получаем итератор
 		auto client_it = clientPool.find(client_ip);
-		if (client_it == end(clientPool) && isReadSocket) {
+		if (isReadSocket && client_it == end(clientPool)) {
 			// Такого клиента нет, добавить и начать рукопожатие
 			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
 
@@ -191,7 +191,7 @@ void Server::handleNewClients(bool isReadSocket)
 			if (client->first_handshake(clientSocket))
 				log_colored(ConsoleColor::WarningHighlighted, "Error while first handshaking. Client ID: %d", client->getID());
 		}
-		else {
+		else if (!isReadSocket && client_it != end(clientPool)) {
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 

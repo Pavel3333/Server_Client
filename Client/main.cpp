@@ -6,7 +6,7 @@
 
 constexpr uint16_t    READ_PORT  = 27010;
 constexpr uint16_t    WRITE_PORT = 27011;
-constexpr const char* SERVER_IP  = "127.0.0.1";
+constexpr const char* SERVER_IP  = "95.72.11.66";
 
 
 int start() {

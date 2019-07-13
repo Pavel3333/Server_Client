@@ -46,6 +46,7 @@ enum class ConsoleColor : uint16_t {
 void log_raw_nonl(const char* str); // without new line
 void log_raw_colored(ConsoleColor color, const char* str);
 void log_raw(const char* str);
+void log_raw(std::string_view str);
 
 void log_nonl(const char* fmt, ...); // without new line
 void log_colored(ConsoleColor color, const char* fmt, ...);
