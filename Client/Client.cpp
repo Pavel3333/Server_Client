@@ -5,14 +5,23 @@
 
 std::mutex msg_mutex;
 
+static void printThreadDesc() {
+	wchar_t* threadDesc;
+	getThreadDesc(&threadDesc);
+	wprintf(L"[%s]", threadDesc);
+}
+
+
 void log_raw_nonl(const char* str) {
 	msg_mutex.lock();
+	printThreadDesc();
 	cout << str;
 	msg_mutex.unlock();
 }
 
 void log_raw(const char* str) {
 	msg_mutex.lock();
+	printThreadDesc();
 	cout << str << endl;
 	msg_mutex.unlock();
 }
@@ -20,6 +29,7 @@ void log_raw(const char* str) {
 
 void log_nonl(const char* fmt, ...) {
 	msg_mutex.lock();
+	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
@@ -29,6 +39,7 @@ void log_nonl(const char* fmt, ...) {
 
 void log(const char* fmt, ...) {
 	msg_mutex.lock();
+	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
@@ -61,6 +72,12 @@ Packet::~Packet() { delete[] this->data; }
 
 
 void __wsa_print_err(const char* file, uint16_t line) { log("%s:%d - WSA Error %d", file, line, WSAGetLastError()); }
+
+// Set description to current thread
+void setThreadDesc(const wchar_t* desc) { SetThreadDescription(GetCurrentThread(), desc); }
+
+// Get description of current thread
+void getThreadDesc(wchar_t** dest) { GetThreadDescription(GetCurrentThread(), dest); }
 
 
 Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
@@ -200,6 +217,9 @@ int Client::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
 }
 
 void Client::receiverThread() { // Поток обработки входящих пакетов
+	// Set thread description
+	setThreadDesc(L"Receiver");
+
 	while (started) {
 		if (int err = handlePacketIn(std::bind(&Client::any_packet_handler, this, std::placeholders::_1))) {
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
@@ -212,6 +232,9 @@ void Client::receiverThread() { // Поток обработки входящих пакетов
 }
 
 void Client::senderThread() { // Поток отправки пакетов
+	// Set thread description
+	setThreadDesc(L"Sender");
+
 	while (started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {

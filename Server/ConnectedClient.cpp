@@ -135,6 +135,9 @@ int ConnectedClient::handlePacketOut(PacketPtr packet)
 // Поток обработки входящих пакетов
 void ConnectedClient::receiverThread()
 {
+	// Set thread description
+	setThreadDesc(L"Receiver");
+
 	while (started) {
 		int err = handlePacketIn(std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1));
 		if (err) {
@@ -151,6 +154,9 @@ void ConnectedClient::receiverThread()
 // Поток отправки пакетов
 void ConnectedClient::senderThread()
 {
+	// Set thread description
+	setThreadDesc(L"Sender");
+
 	while (started) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {

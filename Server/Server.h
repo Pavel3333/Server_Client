@@ -35,8 +35,8 @@ private:
 	void handleNewClients(bool isReadSocket);
 	void setState(ServerState state);
 
-	std::thread handlerFirstHandshakes;
-	std::thread handlerSecondHandshakes;
+	std::thread firstHandshakesHandler;
+	std::thread secondHandshakesHandler;
 
 	bool started;
 

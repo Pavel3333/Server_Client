@@ -18,6 +18,9 @@ int start() {
 
 int main()
 {
+	// Set thread description
+	setThreadDesc(L"main");
+
 	if (int err = start())
 		log("Client creating failed - error: %d", err);
 

@@ -4,14 +4,23 @@
 
 std::mutex msg_mutex;
 
+static void printThreadDesc() {
+	wchar_t* threadDesc;
+	getThreadDesc(&threadDesc);
+	wprintf(L"[%s] ", threadDesc);
+}
+
+
 void log_raw_nonl(const char* str) {
 	msg_mutex.lock();
+	printThreadDesc();
 	cout << str;
 	msg_mutex.unlock();
 }
 
 void log_raw(const char* str) {
 	msg_mutex.lock();
+	printThreadDesc();
 	cout << str << endl;
 	msg_mutex.unlock();
 }
@@ -19,6 +28,7 @@ void log_raw(const char* str) {
 
 void log_nonl(const char* fmt, ...) {
 	msg_mutex.lock();
+	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
@@ -28,6 +38,7 @@ void log_nonl(const char* fmt, ...) {
 
 void log(const char* fmt, ...) {
 	msg_mutex.lock();
+	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
@@ -72,3 +83,9 @@ void __wsa_print_err(const char* file, int line)
 	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
 	msg_mutex.unlock();
 }
+
+// Set description to current thread
+void setThreadDesc(const wchar_t* desc) { SetThreadDescription(GetCurrentThread(), desc); }
+
+// Get description of current thread
+void getThreadDesc(wchar_t** dest) { GetThreadDescription(GetCurrentThread(), dest); }

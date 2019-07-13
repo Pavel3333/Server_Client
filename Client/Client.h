@@ -51,6 +51,12 @@ void __wsa_print_err(const char* file, uint16_t line);
 
 #define wsa_print_err() __wsa_print_err(__FILE__, __LINE__)
 
+// Set description to current thread
+void setThreadDesc(const wchar_t* desc);
+
+// Get description of current thread
+void getThreadDesc(wchar_t** dest);
+
 class Client {
 public:
 	Client(PCSTR IP, uint16_t readPort, uint16_t writePort);

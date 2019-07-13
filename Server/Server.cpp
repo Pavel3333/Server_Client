@@ -40,11 +40,11 @@ int Server::startServer()
 
 	started = true;
 	
-	handlerFirstHandshakes = std::thread(&Server::handleNewClients, this, true);
-	handlerFirstHandshakes.detach();
+	firstHandshakesHandler = std::thread(&Server::handleNewClients, this, true);
+	firstHandshakesHandler.detach();
 
-	handlerSecondHandshakes = std::thread(&Server::handleNewClients, this, false);
-	handlerSecondHandshakes.detach();
+	secondHandshakesHandler = std::thread(&Server::handleNewClients, this, false);
+	secondHandshakesHandler.detach();
 
 	return 0;
 }
@@ -58,11 +58,11 @@ int Server::closeServer()
 
 	// Closing handler threads
 
-	if (handlerFirstHandshakes.joinable())
-		handlerFirstHandshakes.join();
+	if (firstHandshakesHandler.joinable())
+		firstHandshakesHandler.join();
 
-	if (handlerSecondHandshakes.joinable())
-		handlerSecondHandshakes.join();
+	if (secondHandshakesHandler.joinable())
+		secondHandshakesHandler.join();
 
 	// Close the socket
 	setState(ServerState::CloseSockets);
@@ -149,6 +149,9 @@ int Server::initSockets() {
 
 void Server::handleNewClients(bool isReadSocket)
 {
+	// Init local vars
+	uint16_t clientID = 0;
+
 	uint16_t port = readPort;
 	SOCKET socket = listeningReadSocket;
 
@@ -160,10 +163,16 @@ void Server::handleNewClients(bool isReadSocket)
 	sockaddr_in clientDesc;
 	int clientLen = sizeof(clientDesc);
 
+	// Set thread description
+	const wchar_t* fmt = L"NCH (%d)"; //New Client Handler on port %d
+	std::wstring buff;
+	buff.reserve(64);
+
+	wsprintf(buff.data(), fmt, port);
+
+	setThreadDesc(buff.data());
+
 	// 10 clients limit
-
-	uint16_t clientID = 0;
-
 	while (started && clientPool.size() < 10) {
 		log("Wait for client on port %d...", port);
 
