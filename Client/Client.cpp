@@ -198,7 +198,7 @@ SOCKET Client::connect2server(uint16_t port) {
 	inet_pton(AF_INET, IP, &(socketDesc.sin_addr.s_addr));
 
 	//result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (result == INVALID_SOCKET) {
 		wsa_print_err();
 		return INVALID_SOCKET;
