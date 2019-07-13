@@ -87,10 +87,6 @@ Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
 {
 	this->data = new char[size];
 	memcpy(this->data, data, size);
-
-#ifdef _DEBUG
-	log("Packet: %d bytes, data: %s", size, std::string_view(data, size));
-#endif
 }
 
 Packet::~Packet() { delete[] this->data; }
