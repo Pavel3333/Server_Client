@@ -21,26 +21,19 @@ static void printThreadDesc() {
 static void setConsoleColor(ConsoleColor color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (uint16_t)color); }
 
 
-void log_raw_nonl(const char* str) {
+void log_raw_nonl(std::string_view str) {
 	msg_mutex.lock();
 	printThreadDesc();
 	cout << str;
 	msg_mutex.unlock();
 }
 
-void log_raw_colored(ConsoleColor color, const char* str) {
+void log_raw_colored(ConsoleColor color, std::string_view str) {
 	msg_mutex.lock();
 	printThreadDesc();
 	setConsoleColor(color);
 	cout << str << endl;
 	setConsoleColor(ConsoleColor::Default);
-	msg_mutex.unlock();
-}
-
-void log_raw(const char* str) {
-	msg_mutex.lock();
-	printThreadDesc();
-	cout << str << endl;
 	msg_mutex.unlock();
 }
 
@@ -85,6 +78,7 @@ void log(const char* fmt, ...) {
 	cout << endl;
 	msg_mutex.unlock();
 }
+
 
 Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
 	: ID(ID)

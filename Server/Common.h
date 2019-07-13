@@ -21,9 +21,8 @@ enum class ConsoleColor : uint16_t {
 	DefaultHighlighted = 15,
 };
 
-void log_raw_nonl(const char* str); // without new line
-void log_raw_colored(ConsoleColor color, const char* str);
-void log_raw(const char* str);
+void log_raw_nonl(std::string_view str); // without new line
+void log_raw_colored(ConsoleColor color, std::string_view str);
 void log_raw(std::string_view str);
 
 void log_nonl(const char* fmt, ...); // without new line
@@ -34,9 +33,9 @@ struct Packet {
 	Packet(uint32_t ID, const char* data, size_t size, bool needACK);
 	~Packet();
 	uint32_t ID;
-	char* data;
 	size_t size;
 	bool needACK;
+	char* data;
 };
 
 typedef std::shared_ptr<Packet> PacketPtr;
