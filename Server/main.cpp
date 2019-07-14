@@ -80,6 +80,7 @@ void printCommandsList() {
 	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"      => Send the packet to all clients");
 	log_raw_colored(ConsoleColor::Info,            "  \"save\"          => Save all data into the file");
 	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
+	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
 	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
 }
 
@@ -164,9 +165,11 @@ int start()
 		else if (cmd == "clean") {
 			server.cleanInactiveClients();
 		}
+		else if (cmd == "commands") { // Вывод всех доступных команд
+			printCommandsList();
+		}
 		else if (cmd == "close") { // Закрытие сервера
-			if (server.closeServer())
-				log_raw_colored(ConsoleColor::DangerHighlighted, "Error while closing the server");
+			server.closeServer();
 		}
 	}
 

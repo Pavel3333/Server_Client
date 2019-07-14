@@ -54,10 +54,10 @@ int Server::startServer()
 	return 0;
 }
 
-int Server::closeServer()
+void Server::closeServer()
 {
 	if (!started)
-		return 0;
+		return;
 
 	started = false;
 
@@ -90,21 +90,18 @@ int Server::closeServer()
 	WSACleanup();
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "The server was stopped");
-
-	return 0;
 }
 
 
 size_t Server::getActiveClientsCount() {
 	size_t counter = 0;
 
-	clients_mutex.lock();
-	for (auto client_it : clientPool) {
-		ConnectedClient& client = *(client_it.second);
+	size_t* ctr_ptr = &counter;
 
-		if (client.isRunning()) counter++;
-	}
-	clients_mutex.unlock();
+	processClients(
+		true, // Увеличивать counter только для активных клиентов
+		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
+	);
 
 	return counter;
 }
