@@ -72,18 +72,6 @@ void saveData(ConnectedClient& client) {
 	fil.close();
 }
 
-void printCommandsList() {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
-	log_raw_colored(ConsoleColor::Info,            "  \"list\"          => Print list of all active clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"list_detailed\" => Print list of all active clients with extra info");
-	log_raw_colored(ConsoleColor::Info,            "  \"send\"          => Send the packet to client");
-	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"      => Send the packet to all clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"save\"          => Save all data into the file");
-	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
-	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
-	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
-}
-
 int start()
 {
 	Server server { READ_PORT, WRITE_PORT };
@@ -91,7 +79,7 @@ int start()
 	if (server.startServer())
 		return 1;
 
-	printCommandsList();
+	server.printCommandsList();
 
 	while (server.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
@@ -162,11 +150,17 @@ int start()
 
 			log_colored(ConsoleColor::SuccessHighlighted, "Data successfully saved!");
 		}
+		else if (cmd == "enable_cleaner") {
+			server.startCleaner();
+		}
+		else if (cmd == "disable_cleaner") {
+			server.closeCleaner();
+		}
 		else if (cmd == "clean") {
 			server.cleanInactiveClients();
 		}
 		else if (cmd == "commands") { // Вывод всех доступных команд
-			printCommandsList();
+			server.printCommandsList();
 		}
 		else if (cmd == "close") { // Закрытие сервера
 			server.closeServer();

@@ -35,10 +35,8 @@ public:
 	char*    getIP_str() { return this->IP_str; }
 
 	void getInfo(bool ext = false);
-
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
-
-	int disconnect();
+	void disconnect();
 
 	sockaddr_in clientDesc;
 

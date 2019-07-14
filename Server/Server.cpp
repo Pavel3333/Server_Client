@@ -8,6 +8,7 @@ Server::Server(uint16_t readPort, uint16_t writePort)
 	, readPort(readPort)
 	, writePort(writePort)
 	, started(false)
+	, cleanerStarted(false)
 {
 	packetFactory = PacketFactory();
 }
@@ -21,7 +22,7 @@ Server::~Server()
 	clientPool.clear();
 }
 
-
+// Запуск сервера
 int Server::startServer()
 {
 	// Initialize Winsock
@@ -42,18 +43,16 @@ int Server::startServer()
 
 	started = true;
 
-	firstHandshakesHandler = std::thread(&Server::handleNewClients, this, false);
+	firstHandshakesHandler = std::thread(&Server::processIncomeConnection, this, false);
 	firstHandshakesHandler.detach();
 
-	secondHandshakesHandler = std::thread(&Server::handleNewClients, this, true);
+	secondHandshakesHandler = std::thread(&Server::processIncomeConnection, this, true);
 	secondHandshakesHandler.detach();
-
-	cleaner = std::thread(&Server::inactiveClientsCleaner, this);
-	cleaner.detach();
 
 	return 0;
 }
 
+// Отключение сервера
 void Server::closeServer()
 {
 	if (!started)
@@ -69,8 +68,7 @@ void Server::closeServer()
 	if (secondHandshakesHandler.joinable())
 		secondHandshakesHandler.join();
 
-	if (cleaner.joinable())
-		cleaner.join();
+	closeCleaner();
 
 	// Close the socket
 	setState(ServerState::CloseSockets);
@@ -93,6 +91,49 @@ void Server::closeServer()
 }
 
 
+// Запуск клинера
+void Server::startCleaner() {
+	if (cleanerStarted)
+		closeCleaner();
+
+	cleaner = std::thread(&Server::inactiveClientsCleaner, this);
+	cleaner.detach();
+
+	cleanerStarted = true;
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled! You can disable it by \"disable_cleaner\" command");
+}
+
+// Отключение клинера
+void Server::closeCleaner() {
+	cleanerStarted = false;
+
+	if (cleaner.joinable())
+		cleaner.join();
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner disabled! You can enable it by \"enable_cleaner\" command");
+}
+
+
+void Server::printCommandsList() {
+	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
+	log_raw_colored(ConsoleColor::Info,            "  \"list\"            => Print list of all active clients");
+	log_raw_colored(ConsoleColor::Info,            "  \"list_detailed\"   => Print list of all active clients with extra info");
+	log_raw_colored(ConsoleColor::Info,            "  \"send\"            => Send the packet to client");
+	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"        => Send the packet to all clients");
+	log_raw_colored(ConsoleColor::Info,            "  \"save\"            => Save all data into the file");
+
+	if(!cleanerStarted)
+		log_raw_colored(ConsoleColor::Info,        "  \"enable_cleaner\"  => Enable inactive clients cleaner");
+	else
+		log_raw_colored(ConsoleColor::Info,        "  \"disable_cleaner\" => Disable inactive clients cleaner");
+
+	log_raw_colored(ConsoleColor::Info,            "  \"clean\"           => Clean all inactive users");
+	log_raw_colored(ConsoleColor::Info,            "  \"commands\"        => Print all available commands");
+	log_raw_colored(ConsoleColor::Danger,          "  \"close\"           => Close the server");
+}
+
+// Получение числа активных клиентов
 size_t Server::getActiveClientsCount() {
 	size_t counter = 0;
 
@@ -106,6 +147,7 @@ size_t Server::getActiveClientsCount() {
 	return counter;
 }
 
+// Очистка неактивных клиентов
 void Server::cleanInactiveClients() {
 	size_t cleaned = 0;
 
@@ -233,17 +275,19 @@ void Server::inactiveClientsCleaner() {
 	// Задать имя потоку
 	setThreadDesc(L"Cleaner");
 
-	while (started) {
+	while (started && cleanerStarted) {
 		cleanInactiveClients();
 
 		Sleep(5000);
 	}
 }
 
-void Server::handleNewClients(bool isReadSocket)
+
+// Обработка входящих подключений
+void Server::processIncomeConnection(bool isReadSocket)
 {
 	// Задать имя потоку
-	setThreadDesc(L"NCH"); // New Client Handler
+	setThreadDesc(L"PIC"); // Processing Incoming Connections
 
 	// Init local vars
 	uint16_t clientID = 0;
@@ -308,7 +352,7 @@ void Server::handleNewClients(bool isReadSocket)
 	}
 
 	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing NCH (New Clients Handler) thread");
+	log_colored(ConsoleColor::InfoHighlighted, "Closing PIC (Processing Incoming Connections) thread");
 }
 
 

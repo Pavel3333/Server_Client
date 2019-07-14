@@ -20,7 +20,8 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 }
 
 ConnectedClient::~ConnectedClient() {
-	if(started) disconnect();
+	if(started)
+		disconnect();
 
 	receivedPackets.clear();
 	sendedPackets.clear();
@@ -60,6 +61,7 @@ int ConnectedClient::second_handshake(SOCKET socket)
 	return 0;
 }
 
+
 void ConnectedClient::getInfo(bool ext)
 {
 	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
@@ -77,10 +79,9 @@ void ConnectedClient::getInfo(bool ext)
 	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
 }
 
-
-int ConnectedClient::disconnect() {
+void ConnectedClient::disconnect() {
 	if (!started)
-		return 0;
+		return;
 
 	started = false;
 
@@ -116,7 +117,7 @@ int ConnectedClient::disconnect() {
 
 	log_colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
 
-	return 0;
+	return;
 }
 
 

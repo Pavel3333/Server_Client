@@ -103,11 +103,12 @@ public:
 	std::vector<PacketPtr> syncPackets;
 
 	int init();
-	
+	void disconnect();
+
 	bool isRunning()                  { return this->started; }
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
-	int disconnect();
+	void printCommandsList();
 private:
 	SOCKET connect2server(uint16_t port);
 

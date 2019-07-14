@@ -26,8 +26,12 @@ public:
 	int  startServer();
 	void closeServer();
 
+	void startCleaner();
+	void closeCleaner();
+
 	bool isRunning() { return this->started; }
 
+	void   printCommandsList();
 	size_t getActiveClientsCount();
 	void   cleanInactiveClients();
 	int    processClients(bool onlyActive, std::function<int(ConnectedClient&)> handler);
@@ -40,7 +44,9 @@ private:
 	int initSockets();
 
 	void inactiveClientsCleaner();
-	void handleNewClients(bool isReadSocket);
+
+	void processIncomeConnection(bool isReadSocket);
+
 	void setState(ServerState state);
 
 	std::thread cleaner;
@@ -49,6 +55,7 @@ private:
 	std::thread secondHandshakesHandler;
 
 	bool started;
+	bool cleanerStarted;
 
 	ServerState state;
 

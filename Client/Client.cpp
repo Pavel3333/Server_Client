@@ -181,9 +181,9 @@ int Client::init() {
 	return 0;
 }
 
-int Client::disconnect() {
+void Client::disconnect() {
 	if (!started)
-		return 0;
+		return;
 
 	started = false;
 
@@ -219,8 +219,13 @@ int Client::disconnect() {
 	WSACleanup();
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
+}
 
-	return 0;
+void printCommandsList() {
+	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
+	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
+	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
+	log_raw_colored(ConsoleColor::Danger, "  \"close\"    => Close the client");
 }
 
 
