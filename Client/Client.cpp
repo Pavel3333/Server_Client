@@ -195,26 +195,30 @@ void Client::disconnect() {
 	if (sender.joinable())
 		sender.join();
 
-	// Shutdown the connection since no more data will be sent
+	// Shutdown the connection
 	setState(ClientState::Shutdown);
 
 	if (readSocket != INVALID_SOCKET)
 		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Read socket shutdown failed: %d", WSAGetLastError());
 
 	if (writeSocket != INVALID_SOCKET)
 		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while shutdowning write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Write socket shutdown failed: %d", WSAGetLastError());
 
-	// Close the socket
+	// Close the sockets
 	setState(ClientState::CloseSockets);
 	if (readSocket != INVALID_SOCKET)
 		if (closesocket(readSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing read socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Read socket close failed: %d", WSAGetLastError());
+
+	readSocket = INVALID_SOCKET;
 
 	if (writeSocket != INVALID_SOCKET)
 		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing write socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Write socket close failed: %d", WSAGetLastError());
+
+	writeSocket = INVALID_SOCKET;
 
 	WSACleanup();
 

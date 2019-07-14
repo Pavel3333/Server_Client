@@ -76,14 +76,18 @@ void Server::closeServer()
 	if (listeningReadSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningReadSocket);
 		if (err == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Closing socket failed: %d", WSAGetLastError());
 	}
+
+	listeningReadSocket = INVALID_SOCKET;
 
 	if (listeningWriteSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningWriteSocket);
 		if (err == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Error while closing socket: %d", WSAGetLastError());
+			log_colored(ConsoleColor::DangerHighlighted, "Closing socket failed: %d", WSAGetLastError());
 	}
+
+	listeningWriteSocket = INVALID_SOCKET;
 
 	WSACleanup();
 
