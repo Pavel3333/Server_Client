@@ -464,7 +464,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
-			else if (err = WSAECONNRESET) {
+			else if (err == WSAECONNRESET) {
 				// Соединение сброшено
 				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 				return -3;
