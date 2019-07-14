@@ -358,6 +358,8 @@ void Client::receiverThread() {
 	// Задать имя потоку
 	setThreadDesc(L"Receiver");
 
+
+
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
 	while (started) {
@@ -468,7 +470,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
-			else if (err == WSAECONNRESET) {
+			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
 				// Соединение сброшено
 				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 				return 2;
