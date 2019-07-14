@@ -428,7 +428,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 
-	while (true) {
+	while (started) {
 		// Цикл принятия сообщений.  Может завершиться:
 		// - после критической ошибки,
 		// - после закрытия соединения,
@@ -442,27 +442,38 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);
+
+			break;
 		}
 		else if (!respSize) {
 			// Соединение сброшено
 			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 			return 1;
 		}
-		else if (respSize == WSAETIMEDOUT) {
-			// Таймаут
-			if (closeAfterTimeout) return -1;
-			else                   continue;
-		}
-		else if (respSize == WSAEMSGSIZE) {
-			// Размер пакета превысил размер буфера
-			// Вывести предупреждение
-			log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
-			return -2;
-		}
 		else {
-			// Критическая ошибка
-			wsa_print_err();
-			return 2;
+			int err = WSAGetLastError();
+
+			if      (err == WSAETIMEDOUT) {
+				// Таймаут
+				if (closeAfterTimeout) return -1;
+				else                   continue;
+			}
+			else if (err == WSAEMSGSIZE) {
+				// Размер пакета превысил размер буфера
+				// Вывести предупреждение
+				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				return -2;
+			}
+			else if (err = WSAECONNRESET) {
+				// Соединение сброшено
+				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				return -3;
+			}
+			else {
+				// Критическая ошибка
+				wsa_print_err();
+				return 2;
+			}
 		}
 	}
 

@@ -66,14 +66,14 @@ void ConnectedClient::getInfo(bool ext)
 {
 	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
 
-	log_colored(ConsoleColor::InfoHighlighted, "  IP:   %s, ", IP_str);
-	log_colored(ConsoleColor::InfoHighlighted, "  host: %s, ", host);
+	log_colored(ConsoleColor::InfoHighlighted, "  IP:   %s", IP_str);
+	log_colored(ConsoleColor::InfoHighlighted, "  host: %s", host);
 
 	if (ext) {
-		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d, ", receivedPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  sended:        %d, ", sendedPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  in main queue: %d, ", mainPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d, ", syncPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  sended:        %d", sendedPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  in main queue: %d", mainPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d", syncPackets.size());
 	}
 
 	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
@@ -246,7 +246,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 
-	while (true) {
+	while (started) {
 		// Цикл принятия сообщений.  Может завершиться:
 		// - после критической ошибки,
 		// - после закрытия соединения,
@@ -260,27 +260,38 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);
+
+			break;
 		}
 		else if (!respSize) {
 			// Соединение сброшено
 			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 			return 1;
 		}
-		else if (respSize == WSAETIMEDOUT) {
-			// Таймаут
-			if (closeAfterTimeout) return -1;
-			else                   continue;
-		}
-		else if (respSize == WSAEMSGSIZE) {
-			// Размер пакета превысил размер буфера
-			// Вывести предупреждение
-			log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
-			return -2;
-		}
 		else {
-			// Критическая ошибка
-			wsa_print_err();
-			return 2;
+			int err = WSAGetLastError();
+
+			if      (err == WSAETIMEDOUT) {
+				// Таймаут
+				if (closeAfterTimeout) return -1;
+				else                   continue;
+			}
+			else if (err == WSAEMSGSIZE) {
+				// Размер пакета превысил размер буфера
+				// Вывести предупреждение
+				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				return -2;
+			}
+			else if (err = WSAECONNRESET) {
+				// Соединение сброшено
+				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				return -3;
+			}
+			else {
+				// Критическая ошибка
+				wsa_print_err();
+				return 2;
+			}
 		}
 	}
 
