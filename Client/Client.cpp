@@ -129,7 +129,10 @@ void __wsa_print_err(const char* file, int line)
 		NULL, err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
 		err_msg, sizeof(err_msg), NULL);
 
+	setConsoleColor(ConsoleColor::DangerHighlighted);
 	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
+	setConsoleColor(ConsoleColor::Default);
+
 	msg_mutex.unlock();
 }
 
@@ -152,14 +155,7 @@ Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
 }
 
 Client::~Client() {
-	if (started) disconnect();
-
-	receivedPackets.clear();
-	sendedPackets.clear();
-	syncPackets.clear();
-
-	while (!mainPackets.empty())
-		mainPackets.pop();
+	disconnect();
 }
 
 
@@ -195,30 +191,14 @@ void Client::disconnect() {
 	if (sender.joinable())
 		sender.join();
 
-	// Shutdown the connection
-	setState(ClientState::Shutdown);
+	// Clear all data
 
-	if (readSocket != INVALID_SOCKET)
-		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Read socket shutdown failed: %d", WSAGetLastError());
+	receivedPackets.clear();
+	sendedPackets.clear();
+	syncPackets.clear();
 
-	if (writeSocket != INVALID_SOCKET)
-		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Write socket shutdown failed: %d", WSAGetLastError());
-
-	// Close the sockets
-	setState(ClientState::CloseSockets);
-	if (readSocket != INVALID_SOCKET)
-		if (closesocket(readSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Read socket close failed: %d", WSAGetLastError());
-
-	readSocket = INVALID_SOCKET;
-
-	if (writeSocket != INVALID_SOCKET)
-		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Write socket close failed: %d", WSAGetLastError());
-
-	writeSocket = INVALID_SOCKET;
+	while (!mainPackets.empty())
+		mainPackets.pop();
 
 	WSACleanup();
 
@@ -226,7 +206,7 @@ void Client::disconnect() {
 }
 
 void Client::printCommandsList() {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
+	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
 	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
 	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
 	log_raw_colored(ConsoleColor::Danger, "  \"close\"    => Close the client");
@@ -252,7 +232,7 @@ SOCKET Client::connect2server(uint16_t port) {
 	// Set socket options
 	setState(ClientState::SetOpts);
 
-	uint32_t value = 3000;
+	uint32_t value = TIMEOUT * 1000;
 	uint32_t size = sizeof(value);
 
 	// Set timeout for sending
@@ -283,8 +263,10 @@ int Client::handshake() {
 	setState(ClientState::CreateReadSocket);
 
 	readSocket = connect2server(readPort);
-	if(readSocket == INVALID_SOCKET)
+	if (readSocket == INVALID_SOCKET) {
+		wsa_print_err();
 		return 1;
+	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
@@ -292,8 +274,10 @@ int Client::handshake() {
 	setState(ClientState::CreateWriteSocket);
 
 	writeSocket = connect2server(writePort);
-	if (writeSocket == INVALID_SOCKET)
+	if (writeSocket == INVALID_SOCKET) {
+		wsa_print_err();
 		return 1;
+	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
@@ -330,6 +314,8 @@ int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfte
 	if (err)
 		return err; // Произошла ошибка
 
+	if (!packet) return -1;
+
 	// Обработка пришедшего пакета
 	return handler(packet);
 }
@@ -358,12 +344,12 @@ void Client::receiverThread() {
 	// Задать имя потоку
 	setThreadDesc(L"Receiver");
 
-
+	int err = 0;
 
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
-	while (started) {
-		int err = handlePacketIn(
+	while (isRunning()) {
+		err = handlePacketIn(
 			std::bind(&Client::any_packet_handler, this, std::placeholders::_1),
 			false
 		);
@@ -374,10 +360,24 @@ void Client::receiverThread() {
 		}
 	}
 
-	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread");
+	// Сбрасываем соединение (сокет для чтения)
+	setState(ClientState::Shutdown);
 
-	disconnect();
+	if (readSocket != INVALID_SOCKET)
+		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
+			wsa_print_err();
+
+	// Закрытие сокета (чтение)
+	setState(ClientState::CloseSocket);
+
+	if (readSocket != INVALID_SOCKET)
+		if (closesocket(readSocket) == SOCKET_ERROR)
+			wsa_print_err();
+
+	readSocket = INVALID_SOCKET;
+
+	// Завершаем поток
+	log_colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -386,7 +386,7 @@ void Client::senderThread()
 	// Задать имя потоку
 	setThreadDesc(L"Sender");
 
-	while (started) {
+	while (isRunning()) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
 			PacketPtr packet = mainPackets.back();
@@ -412,18 +412,31 @@ void Client::senderThread()
 		Sleep(100);
 	}
 
-	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread");
+	// Сбрасываем соединение (сокет для записи)
+	setState(ClientState::Shutdown);
+
+	if (writeSocket != INVALID_SOCKET)
+		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+			wsa_print_err();
+
+	// Закрытие сокета (запись)
+	setState(ClientState::CloseSocket);
+
+	if (writeSocket != INVALID_SOCKET)
+		if (closesocket(writeSocket) == SOCKET_ERROR)
+			wsa_print_err();
+
+	writeSocket = INVALID_SOCKET;
+
+	// Завершаем поток
+	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
 // Создание потоков
 void Client::createThreads()
 {
 	receiver = std::thread(&Client::receiverThread, this);
-	receiver.detach();
-
-	sender = std::thread(&Client::senderThread, this);
-	sender.detach();
+	sender   = std::thread(&Client::senderThread,   this);
 }
 
 
@@ -434,7 +447,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 
-	while (started) {
+	while (isRunning()) {
 		// Цикл принятия сообщений.  Может завершиться:
 		// - после критической ошибки,
 		// - после закрытия соединения,
@@ -519,7 +532,7 @@ void Client::setState(ClientState state)
 		PRINT_STATE(Send);
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(Receive);
-		PRINT_STATE(CloseSockets);
+		PRINT_STATE(CloseSocket);
 	default:
 		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;

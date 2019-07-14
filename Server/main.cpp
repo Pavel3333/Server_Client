@@ -167,6 +167,9 @@ int start()
 		}
 	}
 
+	if (!server.isRunning())
+		server.closeServer();
+
 	return 0;
 }
 

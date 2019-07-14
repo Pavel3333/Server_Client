@@ -37,6 +37,9 @@ int start() {
 		}
 	}
 
+	if (!client.isRunning())
+		client.disconnect();
+
 	return 0;
 }
 

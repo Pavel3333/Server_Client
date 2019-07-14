@@ -16,10 +16,7 @@ Server::Server(uint16_t readPort, uint16_t writePort)
 
 Server::~Server()
 {
-	if (started)
-		closeServer();
-
-	clientPool.clear();
+	closeServer();
 }
 
 // Запуск сервера
@@ -43,11 +40,8 @@ int Server::startServer()
 
 	started = true;
 
-	firstHandshakesHandler = std::thread(&Server::processIncomeConnection, this, false);
-	firstHandshakesHandler.detach();
-
+	firstHandshakesHandler  = std::thread(&Server::processIncomeConnection, this, false);
 	secondHandshakesHandler = std::thread(&Server::processIncomeConnection, this, true);
-	secondHandshakesHandler.detach();
 
 	return 0;
 }
@@ -70,13 +64,17 @@ void Server::closeServer()
 
 	closeCleaner();
 
+	clients_mutex.lock();
+	clientPool.clear();
+	clients_mutex.unlock();
+
 	// Close the socket
 	setState(ServerState::CloseSockets);
 
 	if (listeningReadSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningReadSocket);
 		if (err == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Closing socket failed: %d", WSAGetLastError());
+			wsa_print_err();
 	}
 
 	listeningReadSocket = INVALID_SOCKET;
@@ -84,7 +82,7 @@ void Server::closeServer()
 	if (listeningWriteSocket != INVALID_SOCKET) {
 		int err = closesocket(listeningWriteSocket);
 		if (err == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Closing socket failed: %d", WSAGetLastError());
+			wsa_print_err();
 	}
 
 	listeningWriteSocket = INVALID_SOCKET;
@@ -101,7 +99,6 @@ void Server::startCleaner() {
 		closeCleaner();
 
 	cleaner = std::thread(&Server::inactiveClientsCleaner, this);
-	cleaner.detach();
 
 	cleanerStarted = true;
 
@@ -110,6 +107,9 @@ void Server::startCleaner() {
 
 // Отключение клинера
 void Server::closeCleaner() {
+	if(!cleanerStarted)
+		return;
+
 	cleanerStarted = false;
 
 	if (cleaner.joinable())
@@ -162,6 +162,7 @@ void Server::cleanInactiveClients() {
 		ConnectedClient& client = *(client_it->second);
 
 		if (!client.isRunning()) {
+			client.disconnect();
 			client_it = clientPool.erase(client_it);
 			cleaned++;
 		}
@@ -220,7 +221,7 @@ SOCKET Server::initSocket(uint16_t port) {
 	// Set socket options
 	setState(ServerState::SetOpts);
 	
-	uint32_t value = 3000;
+	uint32_t value = TIMEOUT * 1000;
 	uint32_t size = sizeof(value);
 
 	// Set timeout for sending
@@ -254,8 +255,10 @@ int Server::initSockets() {
 	setState(ServerState::CreateReadSocket);
 
 	listeningReadSocket = initSocket(readPort);
-	if (listeningReadSocket == INVALID_SOCKET)
+	if (listeningReadSocket == INVALID_SOCKET) {
+		wsa_print_err();
 		return 1;
+	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", readPort);
 
@@ -263,8 +266,10 @@ int Server::initSockets() {
 	setState(ServerState::CreateWriteSocket);
 
 	listeningWriteSocket = initSocket(writePort);
-	if (listeningWriteSocket == INVALID_SOCKET)
+	if (listeningWriteSocket == INVALID_SOCKET) {
+		wsa_print_err();
 		return 1;
+	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", writePort);
 
@@ -279,7 +284,7 @@ void Server::inactiveClientsCleaner() {
 	// Задать имя потоку
 	setThreadDesc(L"Cleaner");
 
-	while (started && cleanerStarted) {
+	while (isRunning() && cleanerStarted) {
 		cleanInactiveClients();
 
 		Sleep(5000);
@@ -308,7 +313,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 	int clientLen = sizeof(clientDesc);
 
 	// 10 clients limit
-	while (started) {
+	while (isRunning()) {
 		if(getActiveClientsCount() > 10) {
 			log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
 			Sleep(10000);
@@ -317,12 +322,39 @@ void Server::processIncomeConnection(bool isReadSocket)
 
 		log_colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
 
-		SOCKET clientSocket = accept(socket, (sockaddr*)&clientDesc, &clientLen);
-		if (clientSocket == INVALID_SOCKET)
+		// Ожидание новых подключений
+		setState(ServerState::Waiting);
+
+		int select_res = 0;
+		while (isRunning()) {
+			fd_set s_set;
+			FD_ZERO(&s_set);
+			FD_SET(socket, &s_set);
+			timeval timeout = { TIMEOUT, 0 }; // Таймаут
+
+			select_res = select(select_res + 1, &s_set, 0, 0, &timeout);
+			if (select_res) break;
+
+			Sleep(1000);
+		}
+
+		if (!isRunning())
+			break;
+
+		if (select_res == SOCKET_ERROR)
+			wsa_print_err();
+
+		if (select_res <= 0)
 			continue;
 
-		// Connected to client
+		// Connection to client
 		setState(ServerState::Connect);
+
+		SOCKET clientSocket = accept(socket, (sockaddr*)&clientDesc, &clientLen);
+		if (clientSocket == INVALID_SOCKET) {
+			wsa_print_err();
+			continue;
+		}
 
 		uint32_t client_ip = clientDesc.sin_addr.s_addr;
 
@@ -376,6 +408,7 @@ void Server::setState(ServerState state)
 		PRINT_STATE(Bind)
 		PRINT_STATE(SetOpts)
 		PRINT_STATE(Listen)
+		PRINT_STATE(Waiting)
 		PRINT_STATE(Connect)
 		PRINT_STATE(CloseSockets)
 	default:

@@ -11,6 +11,7 @@ enum class ServerState {
 	Bind,
 	SetOpts,
 	Listen,
+	Waiting,
 	Connect,
 	CloseSockets
 };
@@ -29,7 +30,7 @@ public:
 	void startCleaner();
 	void closeCleaner();
 
-	bool isRunning() { return this->started; }
+	bool isRunning() { return started; }
 
 	void   printCommandsList();
 	size_t getActiveClientsCount();

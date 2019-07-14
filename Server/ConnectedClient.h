@@ -12,7 +12,7 @@ enum class ClientState : uint8_t {
 	Send,
 	Receive,
 	Shutdown,
-	CloseSockets
+	CloseSocket
 };
 
 class ConnectedClient {
@@ -29,10 +29,10 @@ public:
 	int first_handshake(SOCKET socket);
 	int second_handshake(SOCKET socket);
 
-	bool     isRunning() { return this->started; }
-	uint16_t getID()     { return this->ID; }
-	uint32_t getIP_u32() { return this->IP; }
-	char*    getIP_str() { return this->IP_str; }
+	bool     isRunning() { return started && readSocket != INVALID_SOCKET && writeSocket != INVALID_SOCKET; }
+	uint16_t getID()     { return ID; }
+	uint32_t getIP_u32() { return IP; }
+	char*    getIP_str() { return IP_str; }
 
 	void getInfo(bool ext = false);
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }

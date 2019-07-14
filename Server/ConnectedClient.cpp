@@ -20,15 +20,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 }
 
 ConnectedClient::~ConnectedClient() {
-	if(started)
-		disconnect();
-
-	receivedPackets.clear();
-	sendedPackets.clear();
-	syncPackets.clear();
-
-	while (!mainPackets.empty())
-		mainPackets.pop();
+	disconnect();
 }
 
 
@@ -93,34 +85,16 @@ void ConnectedClient::disconnect() {
 	if (sender.joinable())
 		sender.join();
 
-	// Shutdown the connection
-	setState(ClientState::Shutdown);
+	// Clear all data
 
-	if (readSocket != INVALID_SOCKET)
-		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Read socket shutdown failed: %d", WSAGetLastError());
+	receivedPackets.clear();
+	sendedPackets.clear();
+	syncPackets.clear();
 
-	if (writeSocket != INVALID_SOCKET)
-		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Write socket shutdown failed: %d", WSAGetLastError());
-
-	// Close the sockets
-	setState(ClientState::CloseSockets);
-	if (readSocket != INVALID_SOCKET)
-		if (closesocket(readSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Read socket close failed: %d", WSAGetLastError());
-
-	readSocket = INVALID_SOCKET;
-
-	if (writeSocket != INVALID_SOCKET)
-		if (closesocket(writeSocket) == SOCKET_ERROR)
-			log_colored(ConsoleColor::DangerHighlighted, "Write socket close failed: %d", WSAGetLastError());
-
-	writeSocket = INVALID_SOCKET;
+	while (!mainPackets.empty())
+		mainPackets.pop();
 
 	log_colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
-
-	return;
 }
 
 
@@ -146,6 +120,8 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool 
 	int err = receiveData(packet, closeAfterTimeout);
 	if (err)
 		return err; // Произошла ошибка
+
+	if (!packet) return -1;
 
 	// Обработка пришедшего пакета
 	return handler(packet);
@@ -175,11 +151,13 @@ void ConnectedClient::receiverThread() {
 	// Задать имя потоку
 	setThreadDesc(L"Receiver");
 
+	int err = 0;
+
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
-	while (started) {
-		int err = handlePacketIn(
-			std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1), 
+	while (isRunning()) {
+		err = handlePacketIn(
+			std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1),
 			false
 		);
 
@@ -189,10 +167,24 @@ void ConnectedClient::receiverThread() {
 		}
 	}
 
-	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing receiver thread");
+	// Сбрасываем соединение (сокет для чтения)
+	setState(ClientState::Shutdown);
 
-	disconnect();
+	if (readSocket != INVALID_SOCKET)
+		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
+			wsa_print_err();
+
+	// Закрытие сокета (чтение)
+	setState(ClientState::CloseSocket);
+
+	if (readSocket != INVALID_SOCKET)
+		if (closesocket(readSocket) == SOCKET_ERROR)
+			wsa_print_err();
+
+	readSocket = INVALID_SOCKET;
+
+	// Завершаем поток
+	log_colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -201,7 +193,7 @@ void ConnectedClient::senderThread()
 	// Задать имя потоку
 	setThreadDesc(L"Sender");
 
-	while (started) {
+	while (isRunning()) {
 		// Обработать основные пакеты
 		while (!mainPackets.empty()) {
 			PacketPtr packet = mainPackets.back();
@@ -210,11 +202,11 @@ void ConnectedClient::senderThread()
 				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->ID);
 				syncPackets.push_back(packet);
 			}
-			
+
 			mainPackets.pop();
 		}
 
-		// Обработать пакеты, не подтвержденные клиентами
+		// Обработать пакеты, не подтвержденные сервером
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
@@ -227,18 +219,31 @@ void ConnectedClient::senderThread()
 		Sleep(100);
 	}
 
-	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread");
+	// Сбрасываем соединение (сокет для записи)
+	setState(ClientState::Shutdown);
+
+	if (writeSocket != INVALID_SOCKET)
+		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+			wsa_print_err();
+
+	// Закрытие сокета (запись)
+	setState(ClientState::CloseSocket);
+
+	if (writeSocket != INVALID_SOCKET)
+		if (closesocket(writeSocket) == SOCKET_ERROR)
+			wsa_print_err();
+
+	writeSocket = INVALID_SOCKET;
+
+	// Завершаем поток
+	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
 // Создание потоков
 void ConnectedClient::createThreads()
 {
 	receiver = std::thread(&ConnectedClient::receiverThread, this);
-	receiver.detach();
-
-	sender = std::thread(&ConnectedClient::senderThread, this);
-	sender.detach();
+	sender   = std::thread(&ConnectedClient::senderThread,   this);
 }
 
 
@@ -249,7 +254,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 
-	while (started) {
+	while (isRunning()) {
 		// Цикл принятия сообщений.  Может завершиться:
 		// - после критической ошибки,
 		// - после закрытия соединения,
@@ -332,7 +337,7 @@ void ConnectedClient::setState(ClientState state)
 		PRINT_STATE(Send);
 		PRINT_STATE(Receive);
 		PRINT_STATE(Shutdown);
-		PRINT_STATE(CloseSockets);
+		PRINT_STATE(CloseSocket);
 	default:
 		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;

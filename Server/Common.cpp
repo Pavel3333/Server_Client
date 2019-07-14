@@ -127,7 +127,10 @@ void __wsa_print_err(const char* file, int line)
 		NULL, err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
 		err_msg, sizeof(err_msg), NULL);
 
+	setConsoleColor(ConsoleColor::DangerHighlighted);
 	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
+	setConsoleColor(ConsoleColor::Default);
+
 	msg_mutex.unlock();
 }
 

@@ -8,6 +8,7 @@
 #include <functional>
 
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
+constexpr int      TIMEOUT         = 3;    // Таймаут в секундах
 
 enum class ERROR_TYPE : uint8_t {
 	OK = 0,        // Без ошибок
@@ -24,7 +25,7 @@ enum class ClientState : uint8_t {
 	Send,
 	Shutdown,
 	Receive,
-	CloseSockets
+	CloseSocket
 };
 
 extern std::mutex msg_mutex;
@@ -105,7 +106,7 @@ public:
 	int init();
 	void disconnect();
 
-	bool isRunning()                  { return this->started; }
+	bool isRunning()                  { return started && readSocket != INVALID_SOCKET && writeSocket != INVALID_SOCKET; }
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
 	void printCommandsList();

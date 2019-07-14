@@ -3,6 +3,7 @@
 #include <mutex>
 
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
+constexpr int      TIMEOUT         = 3;    // Таймаут в секундах
 
 extern std::mutex msg_mutex;
 
