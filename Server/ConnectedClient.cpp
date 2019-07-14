@@ -42,7 +42,6 @@ int ConnectedClient::first_handshake(SOCKET socket)
 	return 0;
 }
 
-
 // Второе рукопожатие с соединенным клиентом
 int ConnectedClient::second_handshake(SOCKET socket)
 {
@@ -59,6 +58,7 @@ int ConnectedClient::second_handshake(SOCKET socket)
 
 	return 0;
 }
+
 
 int ConnectedClient::disconnect() {
 	if (!started)
@@ -102,15 +102,14 @@ int ConnectedClient::disconnect() {
 }
 
 
-// Обработка пакета ACK
+// Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
 	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
-
-// Обработка любого входящего пакета
+// Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
 	log_raw(std::string_view(packet->data, packet->size));
@@ -118,7 +117,7 @@ int ConnectedClient::any_packet_handler(PacketPtr packet)
 }
 
 
-// Обработка пакета из очереди
+// Обработка входящего пакета
 int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
 {
 	PacketPtr packet;
@@ -131,7 +130,7 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
 	return handler(packet);
 }
 
-
+// Обработка исходящего пакета
 int ConnectedClient::handlePacketOut(PacketPtr packet)
 {
 	// Обработка пакета из очереди
@@ -166,7 +165,6 @@ void ConnectedClient::receiverThread()
 
 	disconnect();
 }
-
 
 // Поток отправки пакетов
 void ConnectedClient::senderThread()
@@ -212,6 +210,7 @@ void ConnectedClient::createThreads()
 	sender = std::thread(&ConnectedClient::senderThread, this);
 	sender.detach();
 }
+
 
 int ConnectedClient::receiveData(PacketPtr& dest)
 {
@@ -264,6 +263,7 @@ int ConnectedClient::sendData(PacketPtr packet) {
 
 	return 0;
 }
+
 
 void ConnectedClient::setState(ClientState state)
 {

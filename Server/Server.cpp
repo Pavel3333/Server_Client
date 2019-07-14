@@ -135,7 +135,6 @@ void Server::cleanInactiveClients() {
 SOCKET Server::initSocket(uint16_t port) {
 	SOCKET result = INVALID_SOCKET;
 
-	// result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); - у меня не работает
 	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (result == INVALID_SOCKET) {
 		wsa_print_err();
@@ -157,6 +156,26 @@ SOCKET Server::initSocket(uint16_t port) {
 		return INVALID_SOCKET;
 	}
 
+	// Set socket options
+	setState(ServerState::SetOpts);
+	
+	uint32_t value = 2000;
+	uint32_t size = sizeof(value);
+
+	// Set timeout for sending
+	err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
+		return INVALID_SOCKET;
+	}
+
+	// Set timeout for receiving
+	err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
+		return INVALID_SOCKET;
+	}
+
 	// Listening the port
 	setState(ServerState::Listen);
 
@@ -170,7 +189,7 @@ SOCKET Server::initSocket(uint16_t port) {
 }
 
 int Server::initSockets() {
-	// Create a read socket that receiving data from server (UDP protocol)
+	// Create a read socket that receiving data from server
 	setState(ServerState::CreateReadSocket);
 
 	listeningReadSocket = initSocket(readPort);
@@ -179,7 +198,7 @@ int Server::initSockets() {
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", readPort);
 
-	// Create a write socket that sending data to the server (UDP protocol)
+	// Create a write socket that sending data to the server
 	setState(ServerState::CreateWriteSocket);
 
 	listeningWriteSocket = initSocket(writePort);
@@ -192,6 +211,7 @@ int Server::initSockets() {
 
 	return 0;
 }
+
 
 void Server::inactiveClientsCleaner() {
 	// Каждую секунду очищать неактивных клиентов
@@ -292,6 +312,7 @@ void Server::setState(ServerState state)
 		PRINT_STATE(CreateReadSocket)
 		PRINT_STATE(CreateWriteSocket)
 		PRINT_STATE(Bind)
+		PRINT_STATE(SetOpts)
 		PRINT_STATE(Listen)
 		PRINT_STATE(Connect)
 		PRINT_STATE(CloseSockets)

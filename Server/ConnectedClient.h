@@ -62,9 +62,9 @@ private:
 	std::thread receiver;
 	std::thread sender;
 
+	bool started;
 	uint16_t ID;
 	uint32_t IP;
-	bool started;
 
 	ClientState state;
 
