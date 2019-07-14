@@ -46,15 +46,16 @@ int ConnectedClient::first_handshake(SOCKET socket)
 int ConnectedClient::second_handshake(SOCKET socket)
 {
 	// Присвоить сокет на чтение
-	// Отправить пакет ACK, подтвердить получение
+	// Отправить Hello пакет и ожидать ответ
 	// Создать потоки-обработчики
 	setState(ClientState::SecondHandshake);
 
 	readSocket = socket;
 	started = true;
-	createThreads();
 
-	//TODO: Отправить пакет ACK, подтвердить получение
+	// TODO: Отправить Hello пакет и ожидать ответ
+
+	createThreads();
 
 	return 0;
 }
@@ -118,11 +119,10 @@ int ConnectedClient::any_packet_handler(PacketPtr packet)
 
 
 // Обработка входящего пакета
-int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
-{
+int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout) {
 	PacketPtr packet;
 
-	int err = receiveData(packet);
+	int err = receiveData(packet, closeAfterTimeout);
 	if (err)
 		return err; // Произошла ошибка
 
@@ -131,29 +131,37 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler)
 }
 
 // Обработка исходящего пакета
-int ConnectedClient::handlePacketOut(PacketPtr packet)
-{
-	// Обработка пакета из очереди
-
+int ConnectedClient::handlePacketOut(PacketPtr packet) {
 	if (sendData(packet))
 		return 1;
 
-	if (packet->needACK)
-		if (handlePacketIn(std::bind(&ConnectedClient::ack_handler, this, std::placeholders::_1)))
+	if (packet->needACK) {                                                         // Если нужно подтверждение отправленного пакета
+		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
+			std::bind(&ConnectedClient::ack_handler, this, std::placeholders::_1),
+			true                                                                   // Таймаут 3 секунды
+		);
+
+		if (err)
 			return 2;
+	}
 
 	return 0;
 }
 
 
 // Поток обработки входящих пакетов
-void ConnectedClient::receiverThread()
-{
-	// Set thread description
+void ConnectedClient::receiverThread() {
+	// Задать имя потоку
 	setThreadDesc(L"Receiver");
 
+	// Ожидание любых входящих пакетов
+	// Таймаут не нужен
 	while (started) {
-		int err = handlePacketIn(std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1));
+		int err = handlePacketIn(
+			std::bind(&ConnectedClient::any_packet_handler, this, std::placeholders::_1), 
+			false
+		);
+
 		if (err) {
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
@@ -169,7 +177,7 @@ void ConnectedClient::receiverThread()
 // Поток отправки пакетов
 void ConnectedClient::senderThread()
 {
-	// Set thread description
+	// Задать имя потоку
 	setThreadDesc(L"Sender");
 
 	while (started) {
@@ -202,6 +210,7 @@ void ConnectedClient::senderThread()
 	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread");
 }
 
+// Создание потоков
 void ConnectedClient::createThreads()
 {
 	receiver = std::thread(&ConnectedClient::receiverThread, this);
@@ -212,46 +221,57 @@ void ConnectedClient::createThreads()
 }
 
 
-int ConnectedClient::receiveData(PacketPtr& dest)
+// Принятие данных
+int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 {
-	// Receive until the peer closes the connection
 	setState(ClientState::Receive);
 
 	std::array<char, NET_BUFFER_SIZE> respBuff;
-	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 
-	if (respSize > 0) {
-		// Записываем данные от клиента
-		dest = packetFactory.create(respBuff.data(), respSize, false);
+	while (true) {
+		// Цикл принятия сообщений.  Может завершиться:
+		// - после критической ошибки,
+		// - после закрытия соединения,
+		// - после таймаута (см. closeAfterTimeout)
 
-		// Добавить пакет
-		receivedPackets.push_back(dest);
-	}
-	else if (!respSize) {
-		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
-		return 1;
-	}
-	else {
-		wsa_print_err();
-		return 2;
+		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
+
+		if      (respSize > 0) {
+			// Записываем данные от клиента
+			dest = packetFactory.create(respBuff.data(), respSize, false);
+
+			// Добавить пакет
+			receivedPackets.push_back(dest);
+		}
+		else if (!respSize) {
+			// Соединение сброшено
+			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			return 1;
+		}
+		else if (respSize == WSAETIMEDOUT) {
+			// Таймаут
+			if (closeAfterTimeout) return -1;
+			else                   continue;
+		}
+		else if (respSize == WSAEMSGSIZE) {
+			// Размер пакета превысил размер буфера
+			// Вывести предупреждение
+			log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+			return -2;
+		}
+		else {
+			// Критическая ошибка
+			wsa_print_err();
+			return 2;
+		}
 	}
 
 	return 0;
 }
 
+// Отправка данных
 int ConnectedClient::sendData(PacketPtr packet) {
-	// Send an initial buffer
 	setState(ClientState::Send);
-
-	/*if (!packet->data) { //Ввести данные
-		std::string req;
-
-		log_raw_nonl("Type what you want to send to client: \n>";
-
-		std::getline(std::cin, req);
-
-		packet = packetFactory.create(req.c_str(), req.size(), false);
-	}*/
 
 	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
 		wsa_print_err();

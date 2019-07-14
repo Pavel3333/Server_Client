@@ -240,6 +240,26 @@ SOCKET Client::connect2server(uint16_t port) {
 		return INVALID_SOCKET;
 	}
 
+	// Set socket options
+	setState(ClientState::SetOpts);
+
+	uint32_t value = 3000;
+	uint32_t size = sizeof(value);
+
+	// Set timeout for sending
+	int err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
+		return INVALID_SOCKET;
+	}
+
+	// Set timeout for receiving
+	err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
+	if (err == SOCKET_ERROR) {
+		wsa_print_err();
+		return INVALID_SOCKET;
+	}
+
 	// Connect to server
 	if (connect(result, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) {
 		wsa_print_err();
@@ -250,7 +270,7 @@ SOCKET Client::connect2server(uint16_t port) {
 }
 
 int Client::handshake() {
-	// Create a read socket that receiving data from server (UDP protocol)
+	// Create a read socket that receiving data from server
 	setState(ClientState::CreateReadSocket);
 
 	readSocket = connect2server(readPort);
@@ -259,7 +279,7 @@ int Client::handshake() {
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
-	// Create a write socket that sending data to the server (UDP protocol)
+	// Create a write socket that sending data to the server
 	setState(ClientState::CreateWriteSocket);
 
 	writeSocket = connect2server(writePort);
@@ -268,60 +288,76 @@ int Client::handshake() {
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
-	//TODO: receive ACK from the server
-
 	started = true;
+
+	//TODO: Принять Hello пакет от сервера, отправить в ответ серверу Hello пакет
 
 	createThreads();
 
 	return 0;
 }
 
-void Client::createThreads() {
-	receiver = std::thread(&Client::receiverThread, this);
-	receiver.detach();
 
-	sender = std::thread(&Client::senderThread, this);
-	sender.detach();
-}
-
-int Client::ack_handler(PacketPtr packet) { // Обработка пакета ACK
+// Обработать пакет ACK
+int Client::ack_handler(PacketPtr packet)
+{
 	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
-int Client::any_packet_handler(PacketPtr packet) { // Обработка любого входящего пакета
+// Обработать любой входящий пакет
+int Client::any_packet_handler(PacketPtr packet)
+{
 	log_raw(std::string_view(packet->data, packet->size));
 	return 0;
 }
 
-int Client::handlePacketIn(std::function<int(PacketPtr)> handler) { // Обработка пакета из очереди
+
+// Обработка входящего пакета
+int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout) {
 	PacketPtr packet;
 
-	if (int err = receiveData(packet))
+	int err = receiveData(packet, closeAfterTimeout);
+	if (err)
 		return err; // Произошла ошибка
 
 	// Обработка пришедшего пакета
 	return handler(packet);
 }
 
-int Client::handlePacketOut(PacketPtr packet) { // Обработка пакета из очереди
+// Обработка исходящего пакета
+int Client::handlePacketOut(PacketPtr packet) {
 	if (sendData(packet))
 		return 1;
 
-	if (packet->needACK)
-		if (handlePacketIn(std::bind(&Client::ack_handler, this, std::placeholders::_1)))
+	if (packet->needACK) {                                                         // Если нужно подтверждение отправленного пакета
+		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
+			std::bind(&Client::ack_handler, this, std::placeholders::_1),
+			true                                                                   // Таймаут 3 секунды
+		);
+
+		if (err)
 			return 2;
+	}
 
 	return 0;
 }
 
-void Client::receiverThread() { // Поток обработки входящих пакетов
-	// Set thread description
+
+// Поток обработки входящих пакетов
+void Client::receiverThread() {
+	// Задать имя потоку
 	setThreadDesc(L"Receiver");
 
+	// Ожидание любых входящих пакетов
+	// Таймаут не нужен
 	while (started) {
-		if (int err = handlePacketIn(std::bind(&Client::any_packet_handler, this, std::placeholders::_1))) {
+		int err = handlePacketIn(
+			std::bind(&Client::any_packet_handler, this, std::placeholders::_1),
+			false
+		);
+
+		if (err) {
 			if (err > 0) break;    // Критическая ошибка или соединение сброшено
 			else         continue; // Неудачный пакет, продолжить прием        
 		}
@@ -333,8 +369,10 @@ void Client::receiverThread() { // Поток обработки входящих пакетов
 	disconnect();
 }
 
-void Client::senderThread() { // Поток отправки пакетов
-	// Set thread description
+// Поток отправки пакетов
+void Client::senderThread()
+{
+	// Задать имя потоку
 	setThreadDesc(L"Sender");
 
 	while (started) {
@@ -367,19 +405,68 @@ void Client::senderThread() { // Поток отправки пакетов
 	log_colored(ConsoleColor::InfoHighlighted, "Closing sender thread");
 }
 
+// Создание потоков
+void Client::createThreads()
+{
+	receiver = std::thread(&Client::receiverThread, this);
+	receiver.detach();
+
+	sender = std::thread(&Client::senderThread, this);
+	sender.detach();
+}
+
+
+// Принятие данных
+int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
+{
+	setState(ClientState::Receive);
+
+	std::array<char, NET_BUFFER_SIZE> respBuff;
+
+	while (true) {
+		// Цикл принятия сообщений.  Может завершиться:
+		// - после критической ошибки,
+		// - после закрытия соединения,
+		// - после таймаута (см. closeAfterTimeout)
+
+		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
+
+		if      (respSize > 0) {
+			// Записываем данные от сервера
+			dest = packetFactory.create(respBuff.data(), respSize, false);
+
+			// Добавить пакет
+			receivedPackets.push_back(dest);
+		}
+		else if (!respSize) {
+			// Соединение сброшено
+			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			return 1;
+		}
+		else if (respSize == WSAETIMEDOUT) {
+			// Таймаут
+			if (closeAfterTimeout) return -1;
+			else                   continue;
+		}
+		else if (respSize == WSAEMSGSIZE) {
+			// Размер пакета превысил размер буфера
+			// Вывести предупреждение
+			log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+			return -2;
+		}
+		else {
+			// Критическая ошибка
+			wsa_print_err();
+			return 2;
+		}
+	}
+
+	return 0;
+}
+
+// Отправка данных
 int Client::sendData(PacketPtr packet) {
-	// Send an initial buffer
 	setState(ClientState::Send);
-
-	/*if (!packet->data) { //Ввести данные
-		std::string req;
-
-		log_raw("Type what you want to send to client: \n>");
-
-		std::getline(std::cin, req);
-
-		packet = packetFactory.create(req.c_str(), req.size(), false);
-	}*/
 
 	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
 		wsa_print_err();
@@ -392,32 +479,6 @@ int Client::sendData(PacketPtr packet) {
 	return 0;
 }
 
-int Client::receiveData(PacketPtr& dest)
-{
-	// Receive until the peer closes the connection
-	setState(ClientState::Receive);
-
-	std::array<char, NET_BUFFER_SIZE> respBuff;
-	int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
-
-	if (respSize > 0) {
-		// Записываем данные от клиента
-		dest = packetFactory.create(respBuff.data(), respSize, false);
-
-		// Добавить пакет
-		receivedPackets.push_back(dest);
-	}
-	else if (!respSize) {
-		log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
-		return 1;
-	}
-	else {
-		wsa_print_err();
-		return 2;
-	}
-
-	return 0;
-}
 
 void Client::setState(ClientState state)
 {
@@ -432,6 +493,7 @@ void Client::setState(ClientState state)
 		PRINT_STATE(InitWinSock);
 		PRINT_STATE(CreateReadSocket);
 		PRINT_STATE(CreateWriteSocket);
+		PRINT_STATE(SetOpts);
 		PRINT_STATE(Send);
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(Receive);

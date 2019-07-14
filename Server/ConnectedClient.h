@@ -46,7 +46,7 @@ private:
 	int ack_handler(PacketPtr packet);
 	int any_packet_handler(PacketPtr packet);
 
-	int handlePacketIn(std::function<int(PacketPtr)>handler);
+	int handlePacketIn(std::function<int(PacketPtr)>handler, bool closeAfterTimeout);
 	int handlePacketOut(PacketPtr packet);
 
 	void receiverThread();
@@ -54,7 +54,7 @@ private:
 
 	void createThreads();
 
-	int receiveData(PacketPtr& dest);
+	int receiveData(PacketPtr& dest, bool closeAfterTimeout);
 	int sendData(PacketPtr packet);
 
 	void setState(ClientState state);

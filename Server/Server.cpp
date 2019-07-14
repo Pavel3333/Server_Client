@@ -159,7 +159,7 @@ SOCKET Server::initSocket(uint16_t port) {
 	// Set socket options
 	setState(ServerState::SetOpts);
 	
-	uint32_t value = 2000;
+	uint32_t value = 3000;
 	uint32_t size = sizeof(value);
 
 	// Set timeout for sending
@@ -213,22 +213,21 @@ int Server::initSockets() {
 }
 
 
+// Каждые 5 секунд очищать неактивных клиентов
 void Server::inactiveClientsCleaner() {
-	// Каждую секунду очищать неактивных клиентов
-
-	// Set thread description
+	// Задать имя потоку
 	setThreadDesc(L"Cleaner");
 
 	while (started) {
 		cleanInactiveClients();
 
-		Sleep(1000);
+		Sleep(5000);
 	}
 }
 
 void Server::handleNewClients(bool isReadSocket)
 {
-	// Set thread description
+	// Задать имя потоку
 	setThreadDesc(L"NCH"); // New Client Handler
 
 	// Init local vars

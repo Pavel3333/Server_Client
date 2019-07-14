@@ -146,7 +146,7 @@ int start()
 
 int main()
 {
-	// Set thread description
+	// Задать имя потоку
 	setThreadDesc(L"main");
 
 	if (int err = start())
