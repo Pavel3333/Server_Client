@@ -221,7 +221,7 @@ void Client::disconnect() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 }
 
-void printCommandsList() {
+void Client::printCommandsList() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
 	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
 	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
