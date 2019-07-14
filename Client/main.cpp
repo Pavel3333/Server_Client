@@ -14,7 +14,7 @@ int start() {
 	if (client.init())
 		return 1;
 
-	printCommandsList();
+	client.printCommandsList();
 
 	while (client.isRunning()) { // Прием команд из командной строки
 		std::string cmd;
@@ -30,7 +30,7 @@ int start() {
 			client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
 		}
 		else if (cmd == "commands") { // Вывод всех доступных команд
-			printCommandsList();
+			client.printCommandsList();
 		}
 		else if (cmd == "close") { // Закрытие клиента
 			client.disconnect();
