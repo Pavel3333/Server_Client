@@ -288,12 +288,12 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			else if (err == WSAECONNRESET) {
 				// Соединение сброшено
 				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
-				return -3;
+				return 2;
 			}
 			else {
 				// Критическая ошибка
 				wsa_print_err();
-				return 2;
+				return 3;
 			}
 		}
 	}
