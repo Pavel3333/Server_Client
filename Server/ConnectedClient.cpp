@@ -60,6 +60,23 @@ int ConnectedClient::second_handshake(SOCKET socket)
 	return 0;
 }
 
+void ConnectedClient::getInfo(bool ext)
+{
+	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
+
+	log_colored(ConsoleColor::InfoHighlighted, "  IP:   %s, ", IP_str);
+	log_colored(ConsoleColor::InfoHighlighted, "  host: %s, ", host);
+
+	if (ext) {
+		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d, ", receivedPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  sended:        %d, ", sendedPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  in main queue: %d, ", mainPackets.size());
+		log_colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d, ", syncPackets.size());
+	}
+
+	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
+}
+
 
 int ConnectedClient::disconnect() {
 	if (!started)

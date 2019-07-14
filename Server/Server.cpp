@@ -131,6 +131,24 @@ void Server::cleanInactiveClients() {
 	if(cleaned) log_colored(ConsoleColor::InfoHighlighted, "Cleaned %d inactive clients", cleaned);
 }
 
+// Обход списка клиентов и их обработка функцией handler
+int Server::processClients(bool onlyActive, std::function<int(ConnectedClient&)> handler) {
+	int err = 0;
+	clients_mutex.lock();
+
+	for (auto client_it : clientPool) {
+		ConnectedClient& client = *(client_it.second);
+
+		if (onlyActive && !client.isRunning()) continue;
+
+		err = handler(client);
+		if (err) break; // В случае ошибки прервать выполнение
+	}
+
+	clients_mutex.unlock();
+	return err;
+}
+
 
 SOCKET Server::initSocket(uint16_t port) {
 	SOCKET result = INVALID_SOCKET;

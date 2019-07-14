@@ -34,6 +34,8 @@ public:
 	uint32_t getIP_u32() { return this->IP; }
 	char*    getIP_str() { return this->IP_str; }
 
+	void getInfo(bool ext = false);
+
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
 	int disconnect();
