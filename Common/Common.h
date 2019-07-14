@@ -3,21 +3,21 @@
 #include <mutex>
 
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
-constexpr int      TIMEOUT         = 3;    // Таймаут в секундах
+constexpr int      TIMEOUT = 3;    // Таймаут в секундах
 
 extern std::mutex msg_mutex;
 
 enum class ConsoleColor : uint16_t {
 	// Тёмные цвета
 	Success = 2,
-	Info    = 3,
-	Danger  = 4,
+	Info = 3,
+	Danger = 4,
 	Warning = 6,
 	Default = 7,
 	// Насыщенные цвета
 	SuccessHighlighted = 10,
-	InfoHighlighted    = 11,
-	DangerHighlighted  = 12,
+	InfoHighlighted = 11,
+	DangerHighlighted = 12,
 	WarningHighlighted = 14,
 	DefaultHighlighted = 15,
 };

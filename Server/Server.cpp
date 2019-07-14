@@ -375,8 +375,9 @@ void Server::processIncomeConnection(bool isReadSocket)
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 
-			if (client.second_handshake(clientSocket))
-				log_colored(ConsoleColor::WarningHighlighted, "Error while second handshaking. Client ID: %d", client.getID());
+			if(!client.isRunning())
+				if (client.second_handshake(clientSocket))
+					log_colored(ConsoleColor::WarningHighlighted, "Error while second handshaking. Client ID: %d", client.getID());
 		}
 		else {
 			// Ошибка, сбросить соединение

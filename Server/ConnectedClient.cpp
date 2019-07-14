@@ -108,7 +108,23 @@ int ConnectedClient::ack_handler(PacketPtr packet)
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::Info, std::string_view(packet->data, packet->size));
+
+	/*std::string_view resp =
+		"HTTP / 1.1 200 OK\r\n"
+		"Date : Wed, 11 Jul 2019 11 : 20 : 59 GMT\r\n"
+		"Server : Apache\r\n"
+		"X - Powered - By : C++ / 17\r\n"
+		"Last - Modified : Wed, 11 Jul 2019 11 : 20 : 59 GMT\r\n"
+		"Content - Language : ru\r\n"
+		"Content - Type : text / html; charset = utf - 8\r\n"
+		"Content - Length: 16\r\n"
+		"Connection : close\r\n"
+		"\r\n"
+		"You are welcome!";
+
+	sendPacket(packetFactory.create(resp.data(), resp.size(), false));*/
+
 	return 0;
 }
 
