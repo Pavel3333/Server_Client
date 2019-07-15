@@ -369,16 +369,16 @@ void ConnectedClient::setState(ClientState state)
 
 std::ostream& operator<< (std::ostream& os, const Packet& packet)
 {
-	os  << "    {"                               << "\n"
-		<< "    ID     : " << packet.ID          << "\n"
-		<< "    size   : " << packet.size() << "\n"
-		<< "    needACK: " << packet.needACK     << "\n"
-		<< "    data   : ";
+	os << "    {"                           << "\n";
+	os << "    ID     : " << packet.ID      << "\n";
+	os << "    size   : " << packet.size()  << "\n";
+	os << "    needACK: " << packet.needACK << "\n";
 
+	os << "    data   : ";
 	os.write(packet.data(), packet.size());
+	os << "\n";
 
-	os  << "\n"
-		<< "    }" << endl;
+	os << "    }" << endl;
 	return os;
 }
 
