@@ -1,11 +1,10 @@
 #pragma once
-
-#include "pch.h"
-
-#include "../Common/Common.h"
-
+#include <vector>
+#include <queue>
 #include <thread>
 #include <functional>
+#include "Common.h"
+
 
 enum class ERROR_TYPE : uint8_t {
 	OK = 0,        // Без ошибок

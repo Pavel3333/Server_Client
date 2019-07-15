@@ -1,10 +1,10 @@
 #pragma once
-
-#include "../Common/Common.h"
-
 #include <thread>
 #include <memory>
+#include <queue>
 #include <functional>
+#include "Common.h"
+
 
 enum class ClientState : uint8_t {
 	FirstHandshake,

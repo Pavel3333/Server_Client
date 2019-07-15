@@ -1,6 +1,10 @@
-#include "pch.h"
 #include <string_view>
 #include "Common.h"
+#include <Windows.h>
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 std::mutex msg_mutex;
 static std::mutex pf_mutex;
