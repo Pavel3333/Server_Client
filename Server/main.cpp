@@ -65,7 +65,7 @@ int start()
 
 					std::getline(std::cin, cmd);
 
-					client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
+					client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
 				}
 				else
 					log_raw_colored(ConsoleColor::WarningHighlighted, "Client is not active!"); // Клиент неактивен
@@ -81,7 +81,7 @@ int start()
 			server.processClients(
 				true, // Посылаем пакеты только активным клиентам
 				[cmd](ConnectedClient& client) -> int 
-				{ client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false)); return 0; }
+				{ client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false)); return 0; }
 			);
 		}
 		else if (cmd == "save") {

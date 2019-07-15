@@ -10,7 +10,6 @@ Server::Server(uint16_t readPort, uint16_t writePort)
 	, started(false)
 	, cleanerStarted(false)
 {
-	packetFactory = PacketFactory();
 }
 
 

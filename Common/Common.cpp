@@ -7,7 +7,6 @@ using std::cout;
 using std::endl;
 
 std::mutex msg_mutex;
-static std::mutex pf_mutex;
 
 static void printThreadDesc() {
 	std::wstring threadDesc;
@@ -99,20 +98,6 @@ Packet::~Packet() { delete[] this->data; }
 //	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
 //	return os;
 //}
-
-PacketFactory::PacketFactory()
-	: ID(0)
-{}
-
-PacketPtr PacketFactory::create(const char* data, size_t size, bool needACK)
-{
-	pf_mutex.lock();
-	PacketPtr result = std::make_shared<Packet>(this->ID++, data, size, needACK);
-	pf_mutex.unlock();
-	return result;
-}
-
-PacketFactory packetFactory;
 
 
 const char* __get_filename(const char* file) {

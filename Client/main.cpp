@@ -26,7 +26,7 @@ int start() {
 
 			std::getline(std::cin, cmd);
 
-			client.sendPacket(packetFactory.create(cmd.data(), cmd.size(), false));
+			client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
 		}
 		else if (cmd == "commands") { // Вывод всех доступных команд
 			client.printCommandsList();

@@ -10,7 +10,6 @@ Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
 	, IP(IP)
 	, started(false)
 {
-	packetFactory = PacketFactory();
 }
 
 Client::~Client() {
@@ -316,7 +315,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 		if      (respSize > 0) {
 			// Записываем данные от сервера
-			dest = packetFactory.create(respBuff.data(), respSize, false);
+			dest = PacketFactory::create(respBuff.data(), respSize, false);
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);

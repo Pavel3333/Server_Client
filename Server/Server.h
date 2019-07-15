@@ -40,7 +40,6 @@ public:
 	int    processClients(bool onlyActive, std::function<int(ConnectedClient&)> handler);
 
 	std::mutex clients_mutex;
-
 private:
 	SOCKET initSocket(uint16_t port);
 

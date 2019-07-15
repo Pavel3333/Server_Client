@@ -123,7 +123,7 @@ int ConnectedClient::any_packet_handler(PacketPtr packet)
 		"\r\n"
 		"You are welcome!";
 
-	sendPacket(packetFactory.create(resp.data(), resp.size(), false));*/
+	sendPacket(PacketFactory::create(resp.data(), resp.size(), false));*/
 
 	return 0;
 }
@@ -280,7 +280,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 
 		if      (respSize > 0) {
 			// Записываем данные от клиента
-			dest = packetFactory.create(respBuff.data(), respSize, false);
+			dest = PacketFactory::create(respBuff.data(), respSize, false);
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);

@@ -2,6 +2,9 @@
 #include <string_view>
 #include <thread>
 #include <mutex>
+#include <atomic>
+
+using std::make_shared;
 
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
 constexpr int      TIMEOUT = 3;    // Таймаут в секундах
@@ -42,17 +45,27 @@ struct Packet {
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
-//std::ostream& operator<< (std::ostream& os, const Packet& val);
-
-class PacketFactory {
+class PacketFactory
+{
 public:
-	PacketFactory();
-	PacketPtr create(const char* data, size_t size, bool needACK);
+	static PacketPtr create(const char* data, size_t size, bool needACK)
+	{
+		return make_shared<Packet>(getID(), data, size, needACK);
+	}
 private:
-	uint32_t ID;
+	static std::atomic_uint getID() {
+		static std::atomic_uint ID;
+
+		return ID++;
+	}
+
+	// Защита от копирования
+	PacketFactory() {}
+	PacketFactory(const PacketFactory&) {};
+	PacketFactory& operator=(PacketFactory&) {};
 };
 
-extern PacketFactory packetFactory;
+//std::ostream& operator<< (std::ostream& os, const Packet& val);
 
 
 // Print WSA errors
