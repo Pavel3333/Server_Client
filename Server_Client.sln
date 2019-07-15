@@ -4,8 +4,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.28307.539
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{24B80323-E7B6-4EFA-90CE-C7C5227B95CC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A91A183A-2B7B-4AE8-8FBB-7AA1AC88301D} = {A91A183A-2B7B-4AE8-8FBB-7AA1AC88301D}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Client", "Client\Client.vcxproj", "{732FD8D0-7A01-4553-8F61-F35AFF175765}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A91A183A-2B7B-4AE8-8FBB-7AA1AC88301D} = {A91A183A-2B7B-4AE8-8FBB-7AA1AC88301D}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ServerAsio", "ServerAsio\ServerAsio.vcxproj", "{30C0C446-80B5-4E0B-A659-71333A434ED6}"
 EndProject

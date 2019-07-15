@@ -6,5 +6,7 @@
 
 #include <iostream>
 
+#include "targetver.h"
+
 using std::cout;
 using std::endl;
