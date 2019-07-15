@@ -3,8 +3,8 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <winsock2.h>
 
-using std::make_shared;
 
 constexpr uint16_t NET_BUFFER_SIZE = 8192;
 constexpr int      TIMEOUT = 3;    // Таймаут в секундах
@@ -34,39 +34,39 @@ void log_nonl(const char* fmt, ...); // without new line
 void log_colored(ConsoleColor color, const char* fmt, ...);
 void log(const char* fmt, ...);
 
-struct Packet {
+
+class Packet: public std::vector<char> {
+public:
 	Packet(uint32_t ID, const char* data, size_t size, bool needACK);
-	~Packet();
+	~Packet() = default;
+
 	uint32_t ID;
-	size_t size;
 	bool needACK;
-	char* data;
+
+	int send(SOCKET s) {
+		return ::send(s, data(), static_cast<int>(size()), 0);
+	}
 };
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
-class PacketFactory
-{
+class PacketFactory {
 public:
-	static PacketPtr create(const char* data, size_t size, bool needACK)
-	{
+	static PacketPtr create(const char* data, size_t size, bool needACK) {
+		using std::make_shared;
 		return make_shared<Packet>(getID(), data, size, needACK);
 	}
 private:
 	static std::atomic_uint getID() {
 		static std::atomic_uint ID;
-
 		return ID++;
 	}
 
 	// Защита от копирования
 	PacketFactory() {}
-	PacketFactory(const PacketFactory&) {};
-	PacketFactory& operator=(PacketFactory&) {};
+	PacketFactory(const PacketFactory&) {}
+	PacketFactory& operator=(PacketFactory&) {}
 };
-
-//std::ostream& operator<< (std::ostream& os, const Packet& val);
-
 
 // Print WSA errors
 const char* __get_filename(const char* file);

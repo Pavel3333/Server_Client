@@ -101,14 +101,14 @@ void ConnectedClient::disconnect() {
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw(std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::Info, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::Info, std::string_view(packet->data(), packet->size()));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"
@@ -326,7 +326,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 int ConnectedClient::sendData(PacketPtr packet) {
 	setState(ClientState::Send);
 
-	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
+	if (packet->send(writeSocket) == SOCKET_ERROR) {
 		wsa_print_err();
 		return 1;
 	}
@@ -367,6 +367,20 @@ void ConnectedClient::setState(ClientState state)
 }
 
 
+std::ostream& operator<< (std::ostream& os, const Packet& packet)
+{
+	os  << "    {"                               << "\n"
+		<< "    ID     : " << packet.ID          << "\n"
+		<< "    size   : " << packet.size() << "\n"
+		<< "    needACK: " << packet.needACK     << "\n"
+		<< "    data   : ";
+
+	os.write(packet.data(), packet.size());
+
+	os  << "\n"
+		<< "    }" << endl;
+	return os;
+}
 
 std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 {
@@ -380,49 +394,22 @@ std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 
 	os << "  received packets: {" << endl;
 
-	for (auto packet : client.receivedPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
+	for (const auto packet : client.receivedPackets) {
+		os << *packet;
 	}
 
 	os << "  }" << endl
 	<< "  sended packets  : {" << endl;
 
-	for (auto packet : client.sendedPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
+	for (const auto packet : client.sendedPackets) {
+		os << *packet;
 	}
 
 	os << "  }" << endl
 	<< "  sync packets    : {" << endl;
 
 	for (const auto packet : client.syncPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
+		os << *packet;
 	}
 
 	os << "  }" << endl

@@ -63,7 +63,7 @@ void Client::disconnect() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 }
 
-void Client::printCommandsList() {
+void Client::printCommandsList() const {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
 	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
 	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
@@ -152,14 +152,14 @@ int Client::handshake() {
 // Обработать пакет ACK
 int Client::ack_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw(std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int Client::any_packet_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw(std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
@@ -361,7 +361,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 int Client::sendData(PacketPtr packet) {
 	setState(ClientState::Send);
 
-	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
+	if (packet->send(writeSocket) == SOCKET_ERROR) {
 		wsa_print_err();
 		return 1;
 	}

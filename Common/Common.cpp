@@ -83,21 +83,11 @@ void log(const char* fmt, ...) {
 
 Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
 	: ID(ID)
-	, size(size)
 	, needACK(needACK)
 {
-	this->data = new char[size];
-	memcpy(this->data, data, size);
+	resize(size);
+	memcpy(this->data(), data, size);
 }
-
-Packet::~Packet() { delete[] this->data; }
-
-
-//std::ostream& operator<< (std::ostream& os, const Packet& packet)
-//{
-//	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
-//	return os;
-//}
 
 
 const char* __get_filename(const char* file) {

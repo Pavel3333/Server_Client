@@ -6,14 +6,14 @@
 #include "Common.h"
 
 
-enum class ERROR_TYPE : uint8_t {
+enum class ERROR_TYPE {
 	OK = 0,        // Без ошибок
 	WARNING,       // Предупреждение
 	SOFT_ERROR,    // Ошибка
 	CRITICAL_ERROR // Критическая ошибка
 };
 
-enum class ClientState : uint8_t {
+enum class ClientState {
 	InitWinSock,
 	CreateReadSocket,
 	CreateWriteSocket,
@@ -38,10 +38,13 @@ public:
 	int init();
 	void disconnect();
 
-	bool isRunning()                  { return started && readSocket != INVALID_SOCKET && writeSocket != INVALID_SOCKET; }
+	bool isRunning() const {
+		return started && readSocket != INVALID_SOCKET
+			           && writeSocket != INVALID_SOCKET; }
+
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
-	void printCommandsList();
+	void printCommandsList() const;
 private:
 	SOCKET connect2server(uint16_t port);
 
