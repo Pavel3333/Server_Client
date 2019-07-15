@@ -365,3 +365,67 @@ void ConnectedClient::setState(ClientState state)
 
 	this->state = state;
 }
+
+
+
+std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
+{
+	os << "IP: \"" << client.getIP_str() << "\" => {" << endl
+	<< "  ID                    : " << client.getID() << endl
+	<< "  running               : " << client.isRunning() << endl
+	<< "  received packets count: " << client.receivedPackets.size() << endl
+	<< "  sended packets count  : " << client.sendedPackets.size() << endl
+	<< "  main packets count    : " << client.mainPackets.size() << endl
+	<< "  sync packets count    : " << client.syncPackets.size() << endl << endl;
+
+	os << "  received packets: {" << endl;
+
+	for (auto packet : client.receivedPackets) {
+		os << "    {" << endl
+			<< "    ID     : " << packet->ID << endl
+			<< "    size   : " << packet->size << endl
+			<< "    needACK: " << packet->needACK << endl
+			<< "    data   : ";
+
+		os.write(packet->data, packet->size);
+
+		os << endl
+			<< "    }" << endl;
+	}
+
+	os << "  }" << endl
+	<< "  sended packets  : {" << endl;
+
+	for (auto packet : client.sendedPackets) {
+		os << "    {" << endl
+			<< "    ID     : " << packet->ID << endl
+			<< "    size   : " << packet->size << endl
+			<< "    needACK: " << packet->needACK << endl
+			<< "    data   : ";
+
+		os.write(packet->data, packet->size);
+
+		os << endl
+			<< "    }" << endl;
+	}
+
+	os << "  }" << endl
+	<< "  sync packets    : {" << endl;
+
+	for (const auto packet : client.syncPackets) {
+		os << "    {" << endl
+			<< "    ID     : " << packet->ID << endl
+			<< "    size   : " << packet->size << endl
+			<< "    needACK: " << packet->needACK << endl
+			<< "    data   : ";
+
+		os.write(packet->data, packet->size);
+
+		os << endl
+			<< "    }" << endl;
+	}
+
+	os << "  }" << endl
+	<< '}' << endl;
+	return os;
+}

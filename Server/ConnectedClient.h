@@ -29,20 +29,25 @@ public:
 	int first_handshake(SOCKET socket);
 	int second_handshake(SOCKET socket);
 
-	bool     isRunning() { return started && readSocket != INVALID_SOCKET && writeSocket != INVALID_SOCKET; }
-	uint16_t getID()     { return ID; }
-	uint32_t getIP_u32() { return IP; }
-	char*    getIP_str() { return IP_str; }
+	bool isRunning() const {
+		return started && readSocket != INVALID_SOCKET
+			           && writeSocket != INVALID_SOCKET; }
+
+	uint16_t getID() const { return ID; }
+
+	uint32_t getIP_u32() const { return IP; }
+	const char* getIP_str() const { return IP_str; }
 
 	void getInfo(bool ext = false);
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 	void disconnect();
 
-	sockaddr_in clientDesc;
 
+private:
+	sockaddr_in clientDesc;
 	SOCKET readSocket;
 	SOCKET writeSocket;
-private:
+
 	int ack_handler(PacketPtr packet);
 	int any_packet_handler(PacketPtr packet);
 
@@ -73,3 +78,5 @@ private:
 };
 
 typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;
+
+std::ostream& operator<< (std::ostream& os, ConnectedClient& client);

@@ -10,65 +10,7 @@ constexpr uint16_t WRITE_PORT = 27010;
 void saveData(ConnectedClient& client) {
 	std::ofstream fil("all_server_data.txt", std::ios::app);
 	fil.setf(std::ios::boolalpha); // Вывод true/false
-
-	fil << "IP: \""                     << client.getIP_str() << "\" => {" << endl
-		<< "  ID                    : " << client.getID()                << endl
-		<< "  running               : " << client.isRunning()            << endl
-		<< "  received packets count: " << client.receivedPackets.size() << endl
-		<< "  sended packets count  : " << client.sendedPackets.size()   << endl
-		<< "  main packets count    : " << client.mainPackets.size()     << endl
-		<< "  sync packets count    : " << client.syncPackets.size()     << endl << endl;
-
-	fil	<< "  received packets: {" << endl;
-
-	for (auto packet : client.receivedPackets) {
-		fil << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		fil.write(packet->data, packet->size);
-
-		fil << endl
-			<< "    }" << endl;
-	}
-
-	fil << "  }" << endl
-		<< "  sended packets  : {" << endl;
-
-	for (auto packet : client.sendedPackets) {
-		fil << "    {"                            << endl
-		    << "    ID     : " << packet->ID      << endl
-			<< "    size   : " << packet->size    << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		fil.write(packet->data, packet->size);
-
-		fil << endl
-			<< "    }" << endl;
-	}
-
-	fil << "  }" << endl
-		<< "  sync packets    : {" << endl;
-
-	for (auto packet: client.syncPackets) {
-		fil << "    {"                            << endl
-		    << "    ID     : " << packet->ID      << endl
-			<< "    size   : " << packet->size    << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		fil.write(packet->data, packet->size);
-
-		fil << endl
-			<< "    }" << endl;
-	}
-
-	fil << "  }" << endl
-		<< '}'   << endl;
-
+	fil << client;
 	fil.close();
 }
 
