@@ -15,45 +15,44 @@ static void printThreadDesc() {
 	wprintf(L"%-22s", desc);
 }
 
-static void setConsoleColor(ConsoleColor color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (uint16_t)color); }
+static void setConsoleColor(ConsoleColor color)
+{
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), static_cast<WORD>(color));
+}
 
 
 void log_raw_nonl(std::string_view str) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	cout << str;
-	msg_mutex.unlock();
 }
 
 void log_raw_colored(ConsoleColor color, std::string_view str) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	setConsoleColor(color);
 	cout << str << endl;
 	setConsoleColor(ConsoleColor::Default);
-	msg_mutex.unlock();
 }
 
 void log_raw(std::string_view str) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	cout << str << endl;
-	msg_mutex.unlock();
 }
 
 
 void log_nonl(const char* fmt, ...) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
 	va_end(args);
-	msg_mutex.unlock();
 }
 
 void log_colored(ConsoleColor color, const char* fmt, ...) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	setConsoleColor(color);
 	va_list args;
@@ -62,32 +61,26 @@ void log_colored(ConsoleColor color, const char* fmt, ...) {
 	va_end(args);
 	setConsoleColor(ConsoleColor::Default);
 	cout << endl;
-	msg_mutex.unlock();
 }
 
 void log(const char* fmt, ...) {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	va_list args;
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
 	va_end(args);
 	cout << endl;
-	msg_mutex.unlock();
 }
 
 
 Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
-	: ID(ID)
-	, size(size)
+	: std::vector<char>(size)
+	, ID(ID)
 	, needACK(needACK)
 {
-	this->data = new char[size];
-	memcpy(this->data, data, size);
+	memcpy(this->data(), data, size);
 }
-
-Packet::~Packet() { delete[] this->data; }
-
 
 std::ostream& operator<< (std::ostream& os, Packet& packet)
 {
@@ -113,7 +106,7 @@ const char* __get_filename(const char* file) {
 
 void __wsa_print_err(const char* file, int line)
 {
-	msg_mutex.lock();
+	std::lock_guard lock(msg_mutex);
 	int err = WSAGetLastError();
 
 	char err_msg[256] = "";
@@ -125,8 +118,13 @@ void __wsa_print_err(const char* file, int line)
 	setConsoleColor(ConsoleColor::DangerHighlighted);
 	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
 	setConsoleColor(ConsoleColor::Default);
+}
 
-	msg_mutex.unlock();
+
+// Set description to current thread
+void setThreadDesc(const wchar_t* desc)
+{
+	SetThreadDescription(GetCurrentThread(), desc);
 }
 
 // Set description to current thread
@@ -142,4 +140,7 @@ void setThreadDesc(const wchar_t* fmt, uint16_t ID) {
 }
 
 // Get description of current thread
-void getThreadDesc(wchar_t** dest) { GetThreadDescription(GetCurrentThread(), dest); }
+void getThreadDesc(wchar_t** dest)
+{
+	GetThreadDescription(GetCurrentThread(), dest);
+}

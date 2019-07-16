@@ -338,7 +338,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 int ConnectedClient::sendData(PacketPtr packet) {
 	setState(ClientState::Send);
 
-	if (send(writeSocket, packet->data, packet->size, 0) == SOCKET_ERROR) {
+	if (packet->send(writeSocket) == SOCKET_ERROR) {
 		wsa_print_err();
 		return 1;
 	}
@@ -379,6 +379,20 @@ void ConnectedClient::setState(ClientState state)
 }
 
 
+std::ostream& operator<< (std::ostream& os, const Packet& packet)
+{
+	os << "    {"                           << "\n";
+	os << "    ID     : " << packet.ID      << "\n";
+	os << "    size   : " << packet.size()  << "\n";
+	os << "    needACK: " << packet.needACK << "\n";
+
+	os << "    data   : ";
+	os.write(packet.data(), packet.size());
+	os << "\n";
+
+	os << "    }" << endl;
+	return os;
+}
 
 std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 {
