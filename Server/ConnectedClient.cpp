@@ -9,7 +9,10 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	, writeSocket(INVALID_SOCKET)
 	, ID(ID)
 	, IP(clientDesc.sin_addr.s_addr)
+	, readPort(-1)
+	, writePort(-1)
 	, started(false)
+	, disconnected(true)
 {
 	// Collecting data about client IP, port and host
 
@@ -25,32 +28,37 @@ ConnectedClient::~ConnectedClient() {
 
 
 // Первое рукопожатие с соединенным клиентом
-int ConnectedClient::first_handshake(SOCKET socket)
+void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 {
 	// Присвоить сокет на запись
 	setState(ClientState::FirstHandshake);
 
+	readPort    = port;
 	writeSocket = socket;
 
-	return 0;
+	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: first handshake was successful!", ID);
+	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Read port: %d", ID, readPort);
 }
 
 // Второе рукопожатие с соединенным клиентом
-int ConnectedClient::second_handshake(SOCKET socket)
+void ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 {
 	// Присвоить сокет на чтение
 	// Отправить Hello пакет и ожидать ответ
 	// Создать потоки-обработчики
 	setState(ClientState::SecondHandshake);
 
+	writePort  = port;
 	readSocket = socket;
 	started = true;
+	disconnected = false;
 
 	// TODO: Отправить Hello пакет и ожидать ответ
 
-	createThreads();
+	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
+	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
 
-	return 0;
+	createThreads();
 }
 
 
@@ -71,9 +79,9 @@ void ConnectedClient::getInfo(bool ext)
 	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
 }
 
-void ConnectedClient::disconnect() {
-	if (!started)
-		return;
+bool ConnectedClient::disconnect() {
+	if (!started || disconnected)
+		return false;
 
 	started = false;
 
@@ -95,20 +103,24 @@ void ConnectedClient::disconnect() {
 		mainPackets.pop();
 
 	log_colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
+
+	disconnected = true;
+
+	return true;
 }
 
 
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::Info, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"
@@ -165,7 +177,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet) {
 // Поток обработки входящих пакетов
 void ConnectedClient::receiverThread() {
 	// Задать имя потоку
-	setThreadDesc(L"Receiver");
+	setThreadDesc(L"[Client %d][Receiver]", ID);
 
 	int err = 0;
 
@@ -207,7 +219,7 @@ void ConnectedClient::receiverThread() {
 void ConnectedClient::senderThread()
 {
 	// Задать имя потоку
-	setThreadDesc(L"Sender");
+	setThreadDesc(L"[Client %d][Sender]", ID);
 
 	while (isRunning()) {
 		// Обработать основные пакеты
@@ -371,61 +383,33 @@ void ConnectedClient::setState(ClientState state)
 std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 {
 	os << "IP: \"" << client.getIP_str() << "\" => {" << endl
-	<< "  ID                    : " << client.getID() << endl
-	<< "  running               : " << client.isRunning() << endl
-	<< "  received packets count: " << client.receivedPackets.size() << endl
-	<< "  sended packets count  : " << client.sendedPackets.size() << endl
-	<< "  main packets count    : " << client.mainPackets.size() << endl
-	<< "  sync packets count    : " << client.syncPackets.size() << endl << endl;
+	   << "  ID                    : " << client.getID()                << endl
+	   << "  running               : " << client.isRunning()            << endl
+	   << "  received packets count: " << client.receivedPackets.size() << endl
+	   << "  sended packets count  : " << client.sendedPackets.size()   << endl
+	   << "  main packets count    : " << client.mainPackets.size()     << endl
+	   << "  sync packets count    : " << client.syncPackets.size()     << endl
+	   << endl;
 
 	os << "  received packets: {" << endl;
 
-	for (auto packet : client.receivedPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
-	}
+	for (auto packet : client.receivedPackets)
+		os << packet;
 
 	os << "  }" << endl
 	<< "  sended packets  : {" << endl;
 
-	for (auto packet : client.sendedPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
-	}
+	for (auto packet : client.sendedPackets)
+		os << packet;
 
 	os << "  }" << endl
 	<< "  sync packets    : {" << endl;
 
-	for (const auto packet : client.syncPackets) {
-		os << "    {" << endl
-			<< "    ID     : " << packet->ID << endl
-			<< "    size   : " << packet->size << endl
-			<< "    needACK: " << packet->needACK << endl
-			<< "    data   : ";
-
-		os.write(packet->data, packet->size);
-
-		os << endl
-			<< "    }" << endl;
-	}
+	for (const auto packet : client.syncPackets)
+		os << packet;
 
 	os << "  }" << endl
 	<< '}' << endl;
+
 	return os;
 }

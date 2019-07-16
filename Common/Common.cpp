@@ -9,14 +9,10 @@ using std::endl;
 std::mutex msg_mutex;
 
 static void printThreadDesc() {
-	std::wstring threadDesc;
-	threadDesc.reserve(32);
-
 	wchar_t* desc;
 	getThreadDesc(&desc);
 
-	wsprintfW(threadDesc.data(), L"[%s]", desc);
-	wprintf(L"%-11s", threadDesc.data());
+	wprintf(L"%-22s", desc);
 }
 
 static void setConsoleColor(ConsoleColor color) { SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (uint16_t)color); }
@@ -93,11 +89,21 @@ Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
 Packet::~Packet() { delete[] this->data; }
 
 
-//std::ostream& operator<< (std::ostream& os, const Packet& packet)
-//{
-//	os << "Packet: " << packet.size << ", " << "data: " << std::string_view(packet.data, packet.size);
-//	return os;
-//}
+std::ostream& operator<< (std::ostream& os, Packet& packet)
+{
+	os << "{" << endl
+		<< "  ID     : " << packet.ID << endl
+		<< "  size   : " << packet.size << endl
+		<< "  needACK: " << packet.needACK << endl
+		<< "  data   : \"";
+
+	os.write(packet.data, packet.size);
+
+	os << "\"" << endl
+		<< "}" << endl;
+
+	return os;
+}
 
 
 const char* __get_filename(const char* file) {
@@ -125,6 +131,15 @@ void __wsa_print_err(const char* file, int line)
 
 // Set description to current thread
 void setThreadDesc(const wchar_t* desc) { SetThreadDescription(GetCurrentThread(), desc); }
+// Set description to current thread with formatting ID
+void setThreadDesc(const wchar_t* fmt, uint16_t ID) {
+	std::wstring buf;
+	buf.reserve(32);
+
+	wsprintfW(buf.data(), fmt, ID);
+
+	SetThreadDescription(GetCurrentThread(), buf.data());
+}
 
 // Get description of current thread
 void getThreadDesc(wchar_t** dest) { GetThreadDescription(GetCurrentThread(), dest); }

@@ -152,14 +152,14 @@ int Client::handshake() {
 // Обработать пакет ACK
 int Client::ack_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int Client::any_packet_handler(PacketPtr packet)
 {
-	log_raw(std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
 	return 0;
 }
 
@@ -200,7 +200,7 @@ int Client::handlePacketOut(PacketPtr packet) {
 // Поток обработки входящих пакетов
 void Client::receiverThread() {
 	// Задать имя потоку
-	setThreadDesc(L"Receiver");
+	setThreadDesc(L"[Receiver]");
 
 	int err = 0;
 
@@ -242,7 +242,7 @@ void Client::receiverThread() {
 void Client::senderThread()
 {
 	// Задать имя потоку
-	setThreadDesc(L"Sender");
+	setThreadDesc(L"[Sender]");
 
 	while (isRunning()) {
 		// Обработать основные пакеты

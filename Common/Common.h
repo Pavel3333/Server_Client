@@ -65,7 +65,7 @@ private:
 	PacketFactory& operator=(PacketFactory&) {};
 };
 
-//std::ostream& operator<< (std::ostream& os, const Packet& val);
+std::ostream& operator<< (std::ostream& os, Packet& packet);
 
 
 // Print WSA errors
@@ -79,6 +79,7 @@ void __wsa_print_err(const char* file, int line);
 
 // Set description to current thread
 void setThreadDesc(const wchar_t* desc);
+void setThreadDesc(const wchar_t* fmt, uint16_t ID);
 
 // Get description of current thread
 void getThreadDesc(wchar_t** dest);

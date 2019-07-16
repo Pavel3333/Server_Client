@@ -9,6 +9,7 @@ Server::Server(uint16_t readPort, uint16_t writePort)
 	, writePort(writePort)
 	, started(false)
 	, cleanerStarted(false)
+	, cleanerMode(CleanerMode::OnlyDisconnect)
 {
 }
 
@@ -93,7 +94,8 @@ void Server::closeServer()
 
 
 // Запуск клинера
-void Server::startCleaner() {
+void Server::startCleaner()
+{
 	if (cleanerStarted)
 		closeCleaner();
 
@@ -101,57 +103,37 @@ void Server::startCleaner() {
 
 	cleanerStarted = true;
 
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled! You can disable it by \"disable_cleaner\" command");
+	cleanerMode = CleanerMode::OnlyDisconnect;
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled!");
+	printCleanerMode();
 }
 
-// Отключение клинера
-void Server::closeCleaner() {
-	if(!cleanerStarted)
-		return;
-
-	cleanerStarted = false;
-
-	if (cleaner.joinable())
-		cleaner.join();
-
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner disabled! You can enable it by \"enable_cleaner\" command");
+void Server::printCleanerCommands() {
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the cleaner:");
+	if (!cleanerStarted)
+		log_raw_colored(ConsoleColor::Info,        "  \"enable_cleaner\"      => Enable inactive clients cleaner");
+	else {
+		log_raw_colored(ConsoleColor::Info,        "  \"get_cleaner_mode\"    => Print cleaner mode");
+		log_raw_colored(ConsoleColor::Info,        "  \"change_cleaner_mode\" => Disable inactive clients cleaner");
+		log_raw_colored(ConsoleColor::Warning,     "  \"disable_cleaner\"     => Disable inactive clients cleaner");
+	}
 }
 
+void Server::printCleanerMode() {
+	const char* mode = "-";
 
-void Server::printCommandsList() {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the server:");
-	log_raw_colored(ConsoleColor::Info,            "  \"list\"            => Print list of all active clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"list_detailed\"   => Print list of all active clients with extra info");
-	log_raw_colored(ConsoleColor::Info,            "  \"send\"            => Send the packet to client");
-	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"        => Send the packet to all clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"save\"            => Save all data into the file");
+	if      (cleanerMode == CleanerMode::OnlyDisconnect)
+		mode = "Only disconnect";
+	else if (cleanerMode == CleanerMode::AgressiveMode)
+		mode = "Agressive mode";
 
-	if(!cleanerStarted)
-		log_raw_colored(ConsoleColor::Info,        "  \"enable_cleaner\"  => Enable inactive clients cleaner");
-	else
-		log_raw_colored(ConsoleColor::Info,        "  \"disable_cleaner\" => Disable inactive clients cleaner");
-
-	log_raw_colored(ConsoleColor::Info,            "  \"clean\"           => Clean all inactive users");
-	log_raw_colored(ConsoleColor::Info,            "  \"commands\"        => Print all available commands");
-	log_raw_colored(ConsoleColor::Danger,          "  \"close\"           => Close the server");
-}
-
-// Получение числа активных клиентов
-size_t Server::getActiveClientsCount() {
-	size_t counter = 0;
-
-	size_t* ctr_ptr = &counter;
-
-	processClients(
-		true, // Увеличивать counter только для активных клиентов
-		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
-	);
-
-	return counter;
+	log_colored(ConsoleColor::InfoHighlighted, "Cleaner mode: %s", mode);
 }
 
 // Очистка неактивных клиентов
-void Server::cleanInactiveClients() {
+void Server::cleanInactiveClients(bool ext)
+{
 	size_t cleaned = 0;
 
 	clients_mutex.lock();
@@ -160,27 +142,86 @@ void Server::cleanInactiveClients() {
 	while (client_it != clientPool.end()) {
 		ConnectedClient& client = *(client_it->second);
 
-		if (!client.isRunning()) {
-			client.disconnect();
-			client_it = clientPool.erase(client_it);
-			cleaned++;
+		if (!client.isRunning() && !client.isDisconnected()) {
+			if (client.disconnect()) {
+				cleaned++;
+				if (cleanerMode == CleanerMode::AgressiveMode) {
+					client_it = clientPool.erase(client_it);
+					continue;
+				}
+			}
 		}
-		else
-			client_it++;
+
+		client_it++;
 	}
 
 	clients_mutex.unlock();
 
-	if(cleaned) log_colored(ConsoleColor::InfoHighlighted, "Cleaned %d inactive clients", cleaned);
+	if (cleaned) {
+		const char* verb = "Disconnected";
+		if (cleanerMode == CleanerMode::AgressiveMode)
+			verb = "Cleaned";
+		
+		log_colored(ConsoleColor::InfoHighlighted, "%s %d inactive clients", verb, cleaned);
+	}
+	else if (ext)
+		log_raw_colored(ConsoleColor::InfoHighlighted, "All clients are active");
 }
 
+// Отключение клинера
+void Server::closeCleaner()
+{
+	if(!cleanerStarted)
+		return;
+
+	cleanerStarted = false;
+
+	if (cleaner.joinable())
+		cleaner.join();
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner disabled!");
+	printCleanerCommands();
+}
+
+
+void Server::printCommandsList()
+{
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
+	log_raw_colored(ConsoleColor::Info,            "  \"list\"          => Print list of all active clients");
+	log_raw_colored(ConsoleColor::Info,            "  \"list_detailed\" => Print list of all active clients with extra info");
+	log_raw_colored(ConsoleColor::Info,            "  \"send\"          => Send the packet to client");
+	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"      => Send the packet to all clients");
+	log_raw_colored(ConsoleColor::Info,            "  \"save\"          => Save all data into the file");
+	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
+	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
+	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
+	printCleanerCommands();
+}
+
+// Получение числа активных клиентов
+size_t Server::getActiveClientsCount()
+{
+	size_t counter = 0;
+
+	size_t* ctr_ptr = &counter;
+
+	processClientsByPair(
+		true, // Увеличивать counter только для активных клиентов
+		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
+	);
+
+	return counter;
+}
+
+
 // Обход списка клиентов и их обработка функцией handler
-int Server::processClients(bool onlyActive, std::function<int(ConnectedClient&)> handler) {
+int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
+{
 	int err = 0;
 	clients_mutex.lock();
 
-	for (auto client_it : clientPool) {
-		ConnectedClient& client = *(client_it.second);
+	for (auto pair : clientPool) {
+		ConnectedClient& client = *(pair.second);
 
 		if (onlyActive && !client.isRunning()) continue;
 
@@ -190,6 +231,57 @@ int Server::processClients(bool onlyActive, std::function<int(ConnectedClient&)>
 
 	clients_mutex.unlock();
 	return err;
+}
+
+// Нахождение итератора клиента, удовлетворяющего условию
+ConnectedClientConstIter Server::findClientIter(bool onlyActive, std::function<bool(ConnectedClient&)> handler)
+{
+	clients_mutex.lock();
+
+	auto client_it = clientPool.cbegin();
+	auto end       = clientPool.cend();
+
+	for (; client_it != end; client_it++) {
+		ConnectedClient& client = *(client_it->second);
+
+		if (onlyActive && !client.isRunning()) continue;
+
+		if (handler(client)) break; // Если клиент удовлетворяет условию - выходим из цикла
+	}
+
+	clients_mutex.unlock();
+
+	return client_it;
+}
+
+// Получить итератор клиента по ID
+ConnectedClientConstIter Server::getClientByID(bool onlyActive, uint32_t ID)
+{
+	return findClientIter(
+		onlyActive,
+		[ID](ConnectedClient& client) -> bool 
+		{ 
+			// Проверка по ID
+			if (client.getID() == ID) return true;
+			return false;
+		});
+}
+
+// Получить итератор клиента по IP (возможно, с портом)
+ConnectedClientConstIter Server::getClientByIP(bool onlyActive, uint32_t IP, int port, bool isReadPort)
+{
+	return findClientIter(
+		onlyActive,
+		[IP, port, isReadPort](ConnectedClient& client) -> bool
+		{
+			// Проверка по IP (и порту)
+			if (client.getIP_u32() == IP) {
+				if (port == -1) return true;
+				auto client_port = client.getPort(isReadPort);
+				if (client_port != -1 && client_port == port) return true;
+			}
+			return false;
+		});
 }
 
 
@@ -281,7 +373,7 @@ int Server::initSockets() {
 // Каждые 5 секунд очищать неактивных клиентов
 void Server::inactiveClientsCleaner() {
 	// Задать имя потоку
-	setThreadDesc(L"Cleaner");
+	setThreadDesc(L"[Server][Cleaner]");
 
 	while (isRunning() && cleanerStarted) {
 		cleanInactiveClients();
@@ -295,11 +387,9 @@ void Server::inactiveClientsCleaner() {
 void Server::processIncomeConnection(bool isReadSocket)
 {
 	// Задать имя потоку
-	setThreadDesc(L"PIC"); // Processing Incoming Connections
+	setThreadDesc(L"[Server][PIC]"); // Processing Incoming Connections
 
 	// Init local vars
-	uint16_t clientID = 0;
-
 	uint16_t port = readPort;
 	SOCKET socket = listeningReadSocket;
 
@@ -355,28 +445,29 @@ void Server::processIncomeConnection(bool isReadSocket)
 			continue;
 		}
 
-		uint32_t client_ip = clientDesc.sin_addr.s_addr;
+		uint32_t client_ip   = clientDesc.sin_addr.s_addr;
+		uint16_t client_port = ntohs(clientDesc.sin_port);
+
+		// Получаем итератор
+		auto client_it = getClientByIP(false, client_ip);
 
 		clients_mutex.lock();
 
-		// Получаем итератор
-		auto client_it = clientPool.find(client_ip);
-		if (!isReadSocket && client_it == end(clientPool)) {
+		auto end = clientPool.cend();
+		if (!isReadSocket && client_it == end) {
 			// Такого клиента нет, добавить и начать рукопожатие
-			auto client = std::make_shared<ConnectedClient>(clientID++, clientDesc, clientLen);
+			auto client = ConnectedClientFactory::create(clientDesc, clientLen);
 
-			clientPool[client_ip] = client;
+			clientPool[client->getID()] = client;
 
-			if (client->first_handshake(clientSocket))
-				log_colored(ConsoleColor::WarningHighlighted, "Error while first handshaking. Client ID: %d", client->getID());
+			client->first_handshake(clientSocket, client_port);
 		}
-		else if (isReadSocket && client_it != end(clientPool)) {
+		else if (isReadSocket && client_it != end) {
 			// Уже есть клиент с таким же IP, продолжить рукопожатие
 			ConnectedClient& client = *(client_it->second);
 
-			if(!client.isRunning())
-				if (client.second_handshake(clientSocket))
-					log_colored(ConsoleColor::WarningHighlighted, "Error while second handshaking. Client ID: %d", client.getID());
+			if (!client.isRunning())
+				client.second_handshake(clientSocket, client_port);
 		}
 		else {
 			// Ошибка, сбросить соединение

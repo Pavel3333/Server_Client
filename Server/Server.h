@@ -5,7 +5,6 @@
 #include "ConnectedClient.h"
 #include "Common.h"
 
-
 enum class ServerState {
 	InitWinSock,
 	CreateReadSocket,
@@ -18,26 +17,43 @@ enum class ServerState {
 	CloseSockets
 };
 
+enum class CleanerMode {
+	OnlyDisconnect,
+	AgressiveMode
+};
+
+typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
+
+typedef ClientPool::iterator       ConnectedClientIter;
+typedef ClientPool::const_iterator ConnectedClientConstIter;
 
 class Server {
 public:
 	Server(uint16_t readPort, uint16_t writePort);
 	~Server();
 
-	std::map<uint32_t, ConnectedClientPtr> clientPool;
+	ClientPool clientPool;
 
 	int  startServer();
 	void closeServer();
 
 	void startCleaner();
+	void printCleanerCommands();
+	void printCleanerMode();
+	void cleanInactiveClients(bool ext = false);
 	void closeCleaner();
 
 	bool isRunning() { return started; }
 
 	void   printCommandsList();
 	size_t getActiveClientsCount();
-	void   cleanInactiveClients();
-	int    processClients(bool onlyActive, std::function<int(ConnectedClient&)> handler);
+
+	int processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler);
+
+	ConnectedClientConstIter findClientIter(bool onlyActive, std::function<bool(ConnectedClient&)> handler);
+
+	ConnectedClientConstIter getClientByID(bool onlyActive, uint32_t ID);
+	ConnectedClientConstIter getClientByIP(bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
 
 	std::mutex clients_mutex;
 private:
@@ -59,7 +75,9 @@ private:
 	bool started;
 	bool cleanerStarted;
 
+	
 	ServerState state;
+	CleanerMode cleanerMode;
 
 	uint16_t readPort;
 	uint16_t writePort;

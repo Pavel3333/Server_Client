@@ -45,7 +45,7 @@ int start() {
 int main()
 {
 	// Задать имя потоку
-	setThreadDesc(L"main");
+	setThreadDesc(L"[main]");
 
 	if (int err = start())
 		log_colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);

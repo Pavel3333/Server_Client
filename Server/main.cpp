@@ -29,77 +29,75 @@ int start()
 		std::cin >> cmd;
 		std::cin.ignore();
 
-		if      (cmd == "list") {
-			server.processClients(
-				true, // Получаем данные всех активных клиентов
+		if      (cmd == "list") { // Получаем данные всех активных клиентов
+			server.processClientsByPair(
+				true,
 				[](ConnectedClient& client) -> int { client.getInfo(); return 0; }
 			);
 		}
-		else if (cmd == "list_detailed") {
-			server.processClients(
-				true, // Получаем данные всех активных клиентов
+		else if (cmd == "list_detailed") { // Получаем расширенные данные всех активных клиентов
+			server.processClientsByPair(
+				true,
 				[](ConnectedClient& client) -> int { client.getInfo(true); return 0; }
 			);
 		}
-		else if (cmd == "send") {
-			log_raw_colored(ConsoleColor::Info, "Please type the client IP");
+		else if (cmd == "send") { // Послать пакет определенному клиенту
+			log_raw_colored(ConsoleColor::Info, "Please type the client ID or IP");
 
 			std::cin >> cmd;
 			std::cin.ignore();
 
-			IN_ADDR IP_struct;
+			ConnectedClientConstIter client_it = server.getClientByID(true, std::stoi(cmd));
+			if (client_it == end(server.clientPool)) {
+				IN_ADDR IP_struct;
+				inet_pton(AF_INET, cmd.data(), &IP_struct);
 
-			inet_pton(AF_INET, cmd.data(), &IP_struct);
-
-			server.clients_mutex.lock();
-
-			auto client_it = server.clientPool.find(IP_struct.s_addr);
-
-			if      (client_it == end(server.clientPool))
-				log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
-			else {
-				ConnectedClient& client = *(client_it->second);
-
-				if (client.isRunning()) {
-					log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
-
-					std::getline(std::cin, cmd);
-
-					client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+				client_it = server.getClientByIP(true, IP_struct.s_addr);
+				if (client_it == end(server.clientPool)) {
+					log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
+					continue;
 				}
-				else
-					log_raw_colored(ConsoleColor::WarningHighlighted, "Client is not active!"); // Клиент неактивен
 			}
 
-			server.clients_mutex.unlock();
-		}
-		else if (cmd == "send_all") {
+			ConnectedClient& client = *(client_it->second);
+
 			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 			std::getline(std::cin, cmd);
 
-			server.processClients(
-				true, // Посылаем пакеты только активным клиентам
+			client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+
+			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+		}
+		else if (cmd == "send_all") { // Посылаем пакеты активным клиентам
+			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+
+			std::getline(std::cin, cmd);
+
+			server.processClientsByPair(
+				true,
 				[cmd](ConnectedClient& client) -> int 
 				{ client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false)); return 0; }
 			);
+
+			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
 		}
-		else if (cmd == "save") {
-			server.processClients(
-				false, // Сохраняем данные всех клиентов, не только активных
+		else if (cmd == "save") { // Сохранение данных всех клиентов
+			server.processClientsByPair(
+				false,
 				[](ConnectedClient& client) -> int { saveData(client); return 0; }
 			);
 
-			log_colored(ConsoleColor::SuccessHighlighted, "Data successfully saved!");
+			log_colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
 		}
-		else if (cmd == "enable_cleaner") {
+		else if (cmd == "enable_cleaner") { // Включение клинера
 			server.startCleaner();
 		}
-		else if (cmd == "disable_cleaner") {
+		else if (cmd == "disable_cleaner") { // Выключение клинера
 			server.closeCleaner();
 		}
-		else if (cmd == "clean") {
-			server.cleanInactiveClients();
+		else if (cmd == "clean") { // Очистка неактивных клиентов
+			server.cleanInactiveClients(true);
 		}
 		else if (cmd == "commands") { // Вывод всех доступных команд
 			server.printCommandsList();
@@ -118,7 +116,7 @@ int start()
 int main()
 {
 	// Задать имя потоку
-	setThreadDesc(L"main");
+	setThreadDesc(L"[main]");
 
 	if (int err = start())
 		log_colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
