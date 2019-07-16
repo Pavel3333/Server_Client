@@ -86,11 +86,11 @@ std::ostream& operator<< (std::ostream& os, Packet& packet)
 {
 	os << "{" << endl
 		<< "  ID     : " << packet.ID << endl
-		<< "  size   : " << packet.size << endl
+		<< "  size   : " << packet.size() << endl
 		<< "  needACK: " << packet.needACK << endl
 		<< "  data   : \"";
 
-	os.write(packet.data, packet.size);
+	os.write(packet.data(), packet.size());
 
 	os << "\"" << endl
 		<< "}" << endl;
@@ -120,12 +120,6 @@ void __wsa_print_err(const char* file, int line)
 	setConsoleColor(ConsoleColor::Default);
 }
 
-
-// Set description to current thread
-void setThreadDesc(const wchar_t* desc)
-{
-	SetThreadDescription(GetCurrentThread(), desc);
-}
 
 // Set description to current thread
 void setThreadDesc(const wchar_t* desc) { SetThreadDescription(GetCurrentThread(), desc); }

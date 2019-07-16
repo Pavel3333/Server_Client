@@ -113,14 +113,14 @@ bool ConnectedClient::disconnect() {
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"

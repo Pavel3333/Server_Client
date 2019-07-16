@@ -152,14 +152,14 @@ int Client::handshake() {
 // Обработать пакет ACK
 int Client::ack_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int Client::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data, packet->size));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
 	return 0;
 }
 
