@@ -30,10 +30,8 @@ int Client::init() {
 		return 1;
 	}
 
-	if (err = handshake()) {
-		started = false;
+	if (err = handshake())
 		return err;
-	}
 
 	return 0;
 }
