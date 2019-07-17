@@ -28,13 +28,13 @@ enum class ClientState {
 
 class Client {
 public:
-	Client(PCSTR IP, uint16_t readPort, uint16_t writePort);
+	Client(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort);
 	~Client();
 
 	std::vector<PacketPtr> receivedPackets;
 	std::vector<PacketPtr> sendedPackets;
 
-	std::queue<PacketPtr> mainPackets;
+	std::queue<PacketPtr>  mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
 	int init();
@@ -44,7 +44,8 @@ public:
 		return started && readSocket  != INVALID_SOCKET
 			           && writeSocket != INVALID_SOCKET; }
 
-	uint16_t getID() const { return ID; }
+	uint16_t         getID()    const { return ID; }
+	std::string_view getLogin() const { return login; }
 
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
@@ -76,6 +77,7 @@ private:
 	ClientState state;
 
 	uint16_t ID;
+	std::string_view login;
 
 	PCSTR IP;
 

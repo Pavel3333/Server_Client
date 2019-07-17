@@ -161,7 +161,7 @@ ConnectedClientPtr Server::findClient(bool lockMutex, bool onlyActive, std::func
 	return result;
 }
 
-// Получить итератор клиента по ID
+// Получить указатель на клиента по ID
 ConnectedClientPtr Server::getClientByID(bool lockMutex, bool onlyActive, uint32_t ID)
 {
 	return findClient(
@@ -175,7 +175,7 @@ ConnectedClientPtr Server::getClientByID(bool lockMutex, bool onlyActive, uint32
 		});
 }
 
-// Получить итератор клиента по IP (возможно, с портом)
+// Получить указатель на клиента по IP (возможно, с портом)
 ConnectedClientPtr Server::getClientByIP(bool lockMutex, bool onlyActive, uint32_t IP, int port, bool isReadPort)
 {
 	return findClient(
@@ -191,6 +191,20 @@ ConnectedClientPtr Server::getClientByIP(bool lockMutex, bool onlyActive, uint32
 			}
 			return false;
 		});
+}
+
+// Получить указатель на клиента по IP (возможно, с портом)
+ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, std::string_view login)
+{
+	return findClient(
+		lockMutex,
+		onlyActive,
+		[login](ConnectedClientPtr client) -> bool
+	{
+		// Проверка по логину
+		if (client->getLogin() == login) return true;
+		return false;
+	});
 }
 
 
@@ -346,11 +360,11 @@ void Server::processIncomeConnection(bool isReadSocket)
 
 		clients_mutex.lock();
 
-		// Получаем итератор
-		ConnectedClientPtr found_client = getClientByIP(false, false, client_ip);
+		// Находим клиента с таким же IP
+		ConnectedClientPtr found_client_same_IP = getClientByIP(false, false, client_ip);
 
 		if (!isReadSocket) {
-			if (!found_client) {
+			if (!found_client_same_IP) {
 				// Такого клиента нет, добавить и начать рукопожатие
 				auto client = ConnectedClientFactory::create(clientDesc, clientLen);
 
@@ -360,12 +374,12 @@ void Server::processIncomeConnection(bool isReadSocket)
 			}
 			else {
 				// Уже есть клиент с таким же IP
-				if (!found_client->isRunning()) {
+				if (!found_client_same_IP->isRunning()) {
 					// Если было когда-то разорвано соединение
-					if (!found_client->isDisconnected())
-						found_client->disconnect();
+					if (!found_client_same_IP->isDisconnected())
+						found_client_same_IP->disconnect();
 					// Начать новое рукопожатие
-					found_client->first_handshake(clientSocket, client_port);
+					found_client_same_IP->first_handshake(clientSocket, client_port);
 				}
 				else {
 					// Ошибка, сбросить соединение
@@ -374,21 +388,40 @@ void Server::processIncomeConnection(bool isReadSocket)
 				}
 			}
 		}
-		else if (isReadSocket && found_client) {
+		else if (isReadSocket && found_client_same_IP) {
 			// Уже есть клиент с таким же IP
-			if (!found_client->isRunning()) {
+			if (!found_client_same_IP->isRunning()) {
 				// Если было когда-то разорвано соединение
-				if (!found_client->isDisconnected())
-					found_client->disconnect();
+				if (!found_client_same_IP->isDisconnected())
+					found_client_same_IP->disconnect();
 				// Продолжить рукопожатие
-				int err = found_client->second_handshake(clientSocket, client_port);
+				int err = found_client_same_IP->second_handshake(clientSocket, client_port);
 				if (err) {
 					// В случае ошибки выводим код ошибки и сбрасываем соединение
 					log_colored(ConsoleColor::DangerHighlighted, "Client %d: second handshake failed: error %d", err);
 					shutdown(clientSocket, SD_BOTH);
 					closesocket(clientSocket);
 				}
-					
+				else {
+					// Ищем клиент с таким же логином
+					ConnectedClientPtr found_client_same_login = getClientByLogin(false, false, found_client_same_IP->getLogin());
+
+					if (!found_client_same_login)
+						// Клиент не найден - создаем потоки-обработчики пакетов
+						found_client_same_IP->createThreads();
+					else if(!found_client_same_login->isRunning()) {
+						// Есть клиент с таким же логином, но с разорванным соединением
+
+						// TODO: перенести порты и сокеты в клиента с таким же логином
+						// TODO: Старый клиент дисконнектнуть, сбросив порты и сокеты
+					}
+					else {
+						// Уже подключен клиент с таким логином
+						// Сбрасываем соединение
+						shutdown(clientSocket, SD_BOTH);
+						closesocket(clientSocket);
+					}
+				}
 			}
 			else {
 				// Ошибка, сбросить соединение

@@ -5,20 +5,20 @@
 #include <atomic>
 #include <winsock2.h>
 
-
-constexpr uint16_t NET_BUFFER_SIZE = 8192;
-constexpr int      TIMEOUT = 3;    // Таймаут в секундах
+constexpr uint8_t  LOGIN_MAX_SIZE  = 24;   // Login string max size
+constexpr uint16_t NET_BUFFER_SIZE = 8192; // Network buffer size
+constexpr int      TIMEOUT         = 3;    // Timeout, in seconds
 
 extern std::mutex msg_mutex;
 
 enum class ConsoleColor {
-	// Тёмные цвета
+	// Dark colors
 	Success = 2,
 	Info = 3,
 	Danger = 4,
 	Warning = 6,
 	Default = 7,
-	// Насыщенные цвета
+	// Rich colors
 	SuccessHighlighted = 10,
 	InfoHighlighted = 11,
 	DangerHighlighted = 12,
@@ -26,13 +26,13 @@ enum class ConsoleColor {
 	DefaultHighlighted = 15,
 };
 
-void log_raw_nonl(std::string_view str); // without new line
-void log_raw_colored(ConsoleColor color, std::string_view str);
-void log_raw(std::string_view str);
+void log_raw_nonl(std::string_view str);                        //         without new line
+void log_raw_colored(ConsoleColor color, std::string_view str); // colored with new line
+void log_raw(std::string_view str);                             //         with new line
 
-void log_nonl(const char* fmt, ...); // without new line
-void log_colored(ConsoleColor color, const char* fmt, ...);
-void log(const char* fmt, ...);
+void log_nonl(const char* fmt, ...);                        //          formatted without new line
+void log_colored(ConsoleColor color, const char* fmt, ...); // colored, formatted with new line
+void log(const char* fmt, ...);                             //          formatted with new line
 
 
 class Packet: public std::vector<char> {
@@ -59,7 +59,6 @@ private:
 };
 
 std::ostream& operator<< (std::ostream& os, Packet& packet);
-
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
@@ -93,8 +92,20 @@ struct ServerHelloPacket {
 };
 
 struct ClientHelloPacket {
+	ClientHelloPacket() {
+		serverHelloPacketID = 0;
+		memset(login, '\0', LOGIN_MAX_SIZE);
+	}
+
+	ClientHelloPacket(uint32_t ID, std::string_view login) {
+		serverHelloPacketID = ID;
+		loginSize           = login.size();
+		memcpy(this->login, login.data(), loginSize);
+	}
+
 	uint32_t serverHelloPacketID;
-	char     login[16];
+	size_t   loginSize;
+	char     login[LOGIN_MAX_SIZE];
 };
 
 

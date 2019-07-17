@@ -2,12 +2,13 @@
 #include <array>
 #include "Client.h"
 
-Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
+Client::Client(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort)
 	: readSocket(INVALID_SOCKET)
 	, writeSocket(INVALID_SOCKET)
 	, readPort(readPort)
 	, writePort(writePort)
 	, ID(0)
+	, login(login)
 	, IP(IP)
 	, started(false)
 {
@@ -171,7 +172,7 @@ int Client::handshake() {
 	// Send a Hello packet to the server
 	setState(ClientState::HelloSending);
 
-	ClientHelloPacket clientHelloRaw { serverHello->getID(), "My login" }; // TODO: сделать получение логина перед созданием клиента
+	ClientHelloPacket clientHelloRaw { serverHello->getID(), login };
 
 	PacketPtr clientHello = PacketFactory::create(reinterpret_cast<const char*>(&clientHelloRaw), sizeof(clientHelloRaw), true);
 

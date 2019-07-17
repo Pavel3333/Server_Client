@@ -31,6 +31,8 @@ public:
 	void first_handshake(SOCKET socket, uint16_t port);
 	int second_handshake(SOCKET socket, uint16_t port);
 
+	void createThreads();
+
 	bool isRunning() const {
 		return started && readSocket  != INVALID_SOCKET
 			           && writeSocket != INVALID_SOCKET; }
@@ -39,7 +41,9 @@ public:
 
 	uint16_t getID() const { return ID; }
 
-	uint32_t getIP_u32() const { return IP; }
+	std::string_view getLogin() const { return login; }
+
+	uint32_t    getIP_u32() const { return IP; }
 	const char* getIP_str() const { return IP_str; }
 
 	int getPort(bool isReadPort) const { return isReadPort ? readPort : writePort; }
@@ -63,8 +67,6 @@ private:
 	void receiverThread();
 	void senderThread();
 
-	void createThreads();
-
 	int receiveData(PacketPtr& dest, bool closeAfterTimeout);
 	int sendData(PacketPtr packet);
 
@@ -81,6 +83,8 @@ private:
 
 	int readPort;
 	int writePort;
+
+	std::string_view login;
 
 	ClientState state;
 

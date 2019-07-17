@@ -89,13 +89,18 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 		// Пришедший ID пакета от сервера
 		// не совпадает с реальным значением
 		return 5;
+	else if (clientHelloRaw.loginSize > LOGIN_MAX_SIZE)
+		// Пришедший размер логина
+		// превышает максимальный
+		return 6;
 
-	// TODO: записать пришедший от клиента логин и отобразить
+	login = std::string_view(clientHelloRaw.login, clientHelloRaw.loginSize);
 
 	started = true;
 	disconnected = false;
 
 	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
+	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
 
 	createThreads();
@@ -103,13 +108,21 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 	return 0;
 }
 
+// Создание потоков
+void ConnectedClient::createThreads()
+{
+	receiver = std::thread(&ConnectedClient::receiverThread, this);
+	sender   = std::thread(&ConnectedClient::senderThread,   this);
+}
+
 
 void ConnectedClient::getInfo(bool ext)
 {
 	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
 
-	log_colored(ConsoleColor::InfoHighlighted, "  IP:   %s", IP_str);
-	log_colored(ConsoleColor::InfoHighlighted, "  host: %s", host);
+	log_colored(ConsoleColor::InfoHighlighted, "  login: %.*s", login.size(), login.data());
+	log_colored(ConsoleColor::InfoHighlighted, "  IP   : %s", IP_str);
+	log_colored(ConsoleColor::InfoHighlighted, "  host : %s", host);
 
 	if (ext) {
 		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
@@ -309,13 +322,6 @@ void ConnectedClient::senderThread()
 	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
-// Создание потоков
-void ConnectedClient::createThreads()
-{
-	receiver = std::thread(&ConnectedClient::receiverThread, this);
-	sender   = std::thread(&ConnectedClient::senderThread,   this);
-}
-
 
 // Принятие данных
 int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
@@ -425,6 +431,7 @@ std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 {
 	os << "IP: \"" << client.getIP_str() << "\" => {" << endl
 	   << "  ID                    : " << client.getID()                << endl
+	   << "  login                 : " << client.getLogin()             << endl
 	   << "  running               : " << client.isRunning()            << endl
 	   << "  received packets count: " << client.receivedPackets.size() << endl
 	   << "  sended packets count  : " << client.sendedPackets.size()   << endl
@@ -432,25 +439,50 @@ std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 	   << "  sync packets count    : " << client.syncPackets.size()     << endl
 	   << endl;
 
-	os << "  received packets: {" << endl;
+	if (!client.receivedPackets.empty()) {
+		os << "  received packets: {" << endl;
 
-	for (auto packet : client.receivedPackets)
-		os << *packet;
+		for (auto packet : client.receivedPackets)
+			os << *packet;
 
-	os << "  }" << endl
-	<< "  sended packets  : {" << endl;
+		os << "  }" << endl;
+	}
 
-	for (auto packet : client.sendedPackets)
-		os << *packet;
+	if (!client.sendedPackets.empty()) {
+		os << "  sended packets  : {" << endl;
 
-	os << "  }" << endl
-	<< "  sync packets    : {" << endl;
+		for (auto packet : client.sendedPackets)
+			os << *packet;
 
-	for (const auto packet : client.syncPackets)
-		os << *packet;
+		os << "  }" << endl;
+	}
 
-	os << "  }" << endl
-	<< '}' << endl;
+	if (!client.mainPackets.empty()) {
+		// Main packets is a queue so we can't read
+		// its elements without copying the queue
+		// and destroying the copied queue
+		std::queue<PacketPtr> mainPacketsCopy = client.mainPackets;
+
+		os << "  main packets    : {" << endl;
+
+		while (!mainPacketsCopy.empty()) {
+			os << *(mainPacketsCopy.front());
+			mainPacketsCopy.pop();
+		}
+
+		os << "  }" << endl;
+	}
+
+	if (!client.syncPackets.empty()) {
+		os << "  sync packets    : {" << endl;
+
+		for (const auto packet : client.syncPackets)
+			os << *packet;
+
+		os << "  }" << endl;
+	}
+
+	os << '}' << endl;
 
 	return os;
 }

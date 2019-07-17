@@ -41,8 +41,9 @@ public:
 
 	ConnectedClientPtr findClient(bool lockMutex, bool onlyActive, std::function<bool(ConnectedClientPtr)> handler);
 
-	ConnectedClientPtr getClientByID(bool lockMutex, bool onlyActive, uint32_t ID);
-	ConnectedClientPtr getClientByIP(bool lockMutex, bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
+	ConnectedClientPtr getClientByID   (bool lockMutex, bool onlyActive, uint32_t ID);
+	ConnectedClientPtr getClientByIP   (bool lockMutex, bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
+	ConnectedClientPtr getClientByLogin(bool lockMutex, bool onlyActive, std::string_view login);
 
 	std::mutex clients_mutex;
 private:

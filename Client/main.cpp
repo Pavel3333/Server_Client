@@ -8,7 +8,22 @@ constexpr uint16_t    WRITE_PORT = 27011;
 constexpr const char* SERVER_IP  = "95.72.11.66";
 
 int start() {
-	Client client { SERVER_IP, READ_PORT, WRITE_PORT };
+	std::string cmd;
+	bool err = true;
+
+	while (err) {
+		log_raw("Please type the login:");
+
+		std::cin >> cmd;
+		std::cin.ignore();
+
+		if (cmd.size() > LOGIN_MAX_SIZE)
+			log_colored(ConsoleColor::DangerHighlighted, "Login size must be less than %d!", LOGIN_MAX_SIZE);
+		else
+			err = false;
+	}
+
+	Client client { cmd, SERVER_IP, READ_PORT, WRITE_PORT };
 
 	if (client.init())
 		return 1;
@@ -16,8 +31,6 @@ int start() {
 	client.printCommandsList();
 
 	while (client.isRunning()) { // Прием команд из командной строки
-		std::string cmd;
-
 		std::cin >> cmd;
 		std::cin.ignore();
 
