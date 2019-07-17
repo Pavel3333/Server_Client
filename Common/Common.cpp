@@ -1,7 +1,6 @@
 #include <string_view>
-#include "Common.h"
-#include <Windows.h>
 #include <iostream>
+#include "Common.h"
 
 using std::cout;
 using std::endl;

@@ -50,13 +50,14 @@ void ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 
 	writePort  = port;
 	readSocket = socket;
-	started = true;
-	disconnected = false;
 
 	// TODO: Отправить Hello пакет и ожидать ответ
 
 	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
+
+	started = true;
+	disconnected = false;
 
 	createThreads();
 }
@@ -408,19 +409,19 @@ std::ostream& operator<< (std::ostream& os, ConnectedClient& client)
 	os << "  received packets: {" << endl;
 
 	for (auto packet : client.receivedPackets)
-		os << packet;
+		os << *packet;
 
 	os << "  }" << endl
 	<< "  sended packets  : {" << endl;
 
 	for (auto packet : client.sendedPackets)
-		os << packet;
+		os << *packet;
 
 	os << "  }" << endl
 	<< "  sync packets    : {" << endl;
 
 	for (const auto packet : client.syncPackets)
-		os << packet;
+		os << *packet;
 
 	os << "  }" << endl
 	<< '}' << endl;

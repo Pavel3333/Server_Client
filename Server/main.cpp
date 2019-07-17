@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Server.h"
+#include "Cleaner.h"
 
 #include <string>
 #include <fstream>
@@ -16,27 +17,26 @@ void saveData(ConnectedClient& client) {
 
 int start()
 {
-	Server server { READ_PORT, WRITE_PORT };
-
-	if (server.startServer())
+	if (Server::getInstance().startServer(READ_PORT, WRITE_PORT) > 0) // Произошла ошибка
 		return 1;
 
-	server.printCommandsList();
+	Server::getInstance().printCommandsList();
+	Cleaner::getInstance().printCommandsList();
 
-	while (server.isRunning()) { // Прием команд из командной строки
+	while (Server::getInstance().isRunning()) { // Прием команд из командной строки
 		std::string cmd;
 
 		std::cin >> cmd;
 		std::cin.ignore();
 
 		if      (cmd == "list") { // Получаем данные всех активных клиентов
-			server.processClientsByPair(
+			Server::getInstance().processClientsByPair(
 				true,
 				[](ConnectedClient& client) -> int { client.getInfo(); return 0; }
 			);
 		}
 		else if (cmd == "list_detailed") { // Получаем расширенные данные всех активных клиентов
-			server.processClientsByPair(
+			Server::getInstance().processClientsByPair(
 				true,
 				[](ConnectedClient& client) -> int { client.getInfo(true); return 0; }
 			);
@@ -47,25 +47,27 @@ int start()
 			std::cin >> cmd;
 			std::cin.ignore();
 
-			ConnectedClientConstIter client_it = server.getClientByID(true, std::stoi(cmd));
-			if (client_it == end(server.clientPool)) {
+			Server::getInstance().clients_mutex.lock();
+
+			ConnectedClientPtr found_client = Server::getInstance().getClientByID(false, true, std::stoi(cmd));
+			if (!found_client) {
 				IN_ADDR IP_struct;
 				inet_pton(AF_INET, cmd.data(), &IP_struct);
 
-				client_it = server.getClientByIP(true, IP_struct.s_addr);
-				if (client_it == end(server.clientPool)) {
+				found_client = Server::getInstance().getClientByIP(false, true, IP_struct.s_addr);
+				if (!found_client) {
 					log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
 					continue;
 				}
 			}
 
-			ConnectedClient& client = *(client_it->second);
-
 			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 			std::getline(std::cin, cmd);
 
-			client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+			found_client->sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+
+			Server::getInstance().clients_mutex.unlock();
 
 			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
 		}
@@ -74,7 +76,7 @@ int start()
 
 			std::getline(std::cin, cmd);
 
-			server.processClientsByPair(
+			Server::getInstance().processClientsByPair(
 				true,
 				[cmd](ConnectedClient& client) -> int 
 				{ client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false)); return 0; }
@@ -83,32 +85,54 @@ int start()
 			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
 		}
 		else if (cmd == "save") { // Сохранение данных всех клиентов
-			server.processClientsByPair(
+			Server::getInstance().processClientsByPair(
 				false,
 				[](ConnectedClient& client) -> int { saveData(client); return 0; }
 			);
 
 			log_colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
 		}
-		else if (cmd == "enable_cleaner") { // Включение клинера
-			server.startCleaner();
-		}
-		else if (cmd == "disable_cleaner") { // Выключение клинера
-			server.closeCleaner();
-		}
 		else if (cmd == "clean") { // Очистка неактивных клиентов
-			server.cleanInactiveClients(true);
+			Cleaner::getInstance().cleanInactiveClients(true);
 		}
 		else if (cmd == "commands") { // Вывод всех доступных команд
-			server.printCommandsList();
+			Server::getInstance().printCommandsList();
+			Cleaner::getInstance().printCommandsList();
 		}
 		else if (cmd == "close") { // Закрытие сервера
-			server.closeServer();
+			Server::getInstance().closeServer();
+		}
+		else if (cmd == "enable_cleaner") { // Включение клинера
+			Cleaner::getInstance().startCleaner();
+		}
+		else if (cmd == "get_cleaner_mode") { // Вывести режим работы клинера
+			Cleaner::getInstance().printCleanerMode();
+		}
+		else if (cmd == "change_cleaner_mode") { // Сменить режим работы клинера
+			log_raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
+			log_raw_colored(ConsoleColor::Info,            "  1 - Only disconnect");
+			log_raw_colored(ConsoleColor::Info,            "  2 - Agressive mode");
+
+			std::cin >> cmd;
+
+			if      (cmd == "1")
+				Cleaner::getInstance().changeCleanerMode(CleanerMode::OnlyDisconnect);
+			else if (cmd == "2")
+				Cleaner::getInstance().changeCleanerMode(CleanerMode::AgressiveMode);
+			else {
+				log_raw_colored(ConsoleColor::WarningHighlighted, "Invalid mode was typed");
+				continue;
+			}
+
+			log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
+		}
+		else if (cmd == "disable_cleaner") { // Выключение клинера
+			Cleaner::getInstance().closeCleaner();
 		}
 	}
 
-	if (!server.isRunning())
-		server.closeServer();
+	if (!Server::getInstance().isRunning())
+		Server::getInstance().closeServer();
 
 	return 0;
 }

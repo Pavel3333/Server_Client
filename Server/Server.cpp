@@ -1,27 +1,21 @@
 #include "pch.h"
 #include "Server.h"
+#include "Cleaner.h"
 
-
-Server::Server(uint16_t readPort, uint16_t writePort)
-    : listeningReadSocket(INVALID_SOCKET)
-	, listeningWriteSocket(INVALID_SOCKET)
-	, readPort(readPort)
-	, writePort(writePort)
-	, started(false)
-	, cleanerStarted(false)
-	, cleanerMode(CleanerMode::OnlyDisconnect)
-{
-}
-
-
-Server::~Server()
-{
-	closeServer();
-}
 
 // Запуск сервера
-int Server::startServer()
+int Server::startServer(uint16_t readPort, uint16_t writePort)
 {
+	if (started)
+		return -1;
+
+	// Init class members
+	this->listeningReadSocket = INVALID_SOCKET;
+	this->listeningWriteSocket = INVALID_SOCKET;
+	this->readPort = readPort;
+	this->writePort = writePort;
+	this->started = false;
+
 	// Initialize Winsock
 	setState(ServerState::InitWinSock);
 
@@ -62,7 +56,7 @@ void Server::closeServer()
 	if (secondHandshakesHandler.joinable())
 		secondHandshakesHandler.join();
 
-	closeCleaner();
+	Cleaner::getInstance().closeCleaner();
 
 	clients_mutex.lock();
 	clientPool.clear();
@@ -93,97 +87,6 @@ void Server::closeServer()
 }
 
 
-// Запуск клинера
-void Server::startCleaner()
-{
-	if (cleanerStarted)
-		closeCleaner();
-
-	cleaner = std::thread(&Server::inactiveClientsCleaner, this);
-
-	cleanerStarted = true;
-
-	cleanerMode = CleanerMode::OnlyDisconnect;
-
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled!");
-	printCleanerMode();
-}
-
-void Server::printCleanerCommands() {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the cleaner:");
-	if (!cleanerStarted)
-		log_raw_colored(ConsoleColor::Info,        "  \"enable_cleaner\"      => Enable inactive clients cleaner");
-	else {
-		log_raw_colored(ConsoleColor::Info,        "  \"get_cleaner_mode\"    => Print cleaner mode");
-		log_raw_colored(ConsoleColor::Info,        "  \"change_cleaner_mode\" => Disable inactive clients cleaner");
-		log_raw_colored(ConsoleColor::Warning,     "  \"disable_cleaner\"     => Disable inactive clients cleaner");
-	}
-}
-
-void Server::printCleanerMode() {
-	const char* mode = "-";
-
-	if      (cleanerMode == CleanerMode::OnlyDisconnect)
-		mode = "Only disconnect";
-	else if (cleanerMode == CleanerMode::AgressiveMode)
-		mode = "Agressive mode";
-
-	log_colored(ConsoleColor::InfoHighlighted, "Cleaner mode: %s", mode);
-}
-
-// Очистка неактивных клиентов
-void Server::cleanInactiveClients(bool ext)
-{
-	size_t cleaned = 0;
-
-	clients_mutex.lock();
-
-	auto client_it = clientPool.begin();
-	while (client_it != clientPool.end()) {
-		ConnectedClient& client = *(client_it->second);
-
-		if (!client.isRunning() && !client.isDisconnected()) {
-			if (client.disconnect()) {
-				cleaned++;
-				if (cleanerMode == CleanerMode::AgressiveMode) {
-					client_it = clientPool.erase(client_it);
-					continue;
-				}
-			}
-		}
-
-		client_it++;
-	}
-
-	clients_mutex.unlock();
-
-	if (cleaned) {
-		const char* verb = "Disconnected";
-		if (cleanerMode == CleanerMode::AgressiveMode)
-			verb = "Cleaned";
-		
-		log_colored(ConsoleColor::InfoHighlighted, "%s %d inactive clients", verb, cleaned);
-	}
-	else if (ext)
-		log_raw_colored(ConsoleColor::InfoHighlighted, "All clients are active");
-}
-
-// Отключение клинера
-void Server::closeCleaner()
-{
-	if(!cleanerStarted)
-		return;
-
-	cleanerStarted = false;
-
-	if (cleaner.joinable())
-		cleaner.join();
-
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner disabled!");
-	printCleanerCommands();
-}
-
-
 void Server::printCommandsList()
 {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
@@ -195,7 +98,6 @@ void Server::printCommandsList()
 	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
 	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
 	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
-	printCleanerCommands();
 }
 
 // Получение числа активных клиентов
@@ -233,51 +135,58 @@ int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedCli
 	return err;
 }
 
-// Нахождение итератора клиента, удовлетворяющего условию
-ConnectedClientConstIter Server::findClientIter(bool onlyActive, std::function<bool(ConnectedClient&)> handler)
+// Нахождение клиента, удовлетворяющего условию
+ConnectedClientPtr Server::findClient(bool lockMutex, bool onlyActive, std::function<bool(ConnectedClientPtr)> handler)
 {
-	clients_mutex.lock();
+	ConnectedClientPtr result;
+
+	if(lockMutex) clients_mutex.lock();
 
 	auto client_it = clientPool.cbegin();
 	auto end       = clientPool.cend();
 
 	for (; client_it != end; client_it++) {
-		ConnectedClient& client = *(client_it->second);
+		ConnectedClientPtr client = client_it->second;
 
-		if (onlyActive && !client.isRunning()) continue;
+		if (onlyActive && !client->isRunning()) continue;
 
-		if (handler(client)) break; // Если клиент удовлетворяет условию - выходим из цикла
+		if (handler(client)) { // Если клиент удовлетворяет условию - выходим из цикла
+			result = client;
+			break;
+		}
 	}
 
-	clients_mutex.unlock();
+	if (lockMutex) clients_mutex.unlock();
 
-	return client_it;
+	return result;
 }
 
 // Получить итератор клиента по ID
-ConnectedClientConstIter Server::getClientByID(bool onlyActive, uint32_t ID)
+ConnectedClientPtr Server::getClientByID(bool lockMutex, bool onlyActive, uint32_t ID)
 {
-	return findClientIter(
+	return findClient(
+		lockMutex,
 		onlyActive,
-		[ID](ConnectedClient& client) -> bool 
+		[ID](ConnectedClientPtr client) -> bool 
 		{ 
 			// Проверка по ID
-			if (client.getID() == ID) return true;
+			if (client->getID() == ID) return true;
 			return false;
 		});
 }
 
 // Получить итератор клиента по IP (возможно, с портом)
-ConnectedClientConstIter Server::getClientByIP(bool onlyActive, uint32_t IP, int port, bool isReadPort)
+ConnectedClientPtr Server::getClientByIP(bool lockMutex, bool onlyActive, uint32_t IP, int port, bool isReadPort)
 {
-	return findClientIter(
+	return findClient(
+		lockMutex,
 		onlyActive,
-		[IP, port, isReadPort](ConnectedClient& client) -> bool
+		[IP, port, isReadPort](ConnectedClientPtr client) -> bool
 		{
 			// Проверка по IP (и порту)
-			if (client.getIP_u32() == IP) {
+			if (client->getIP_u32() == IP) {
 				if (port == -1) return true;
-				auto client_port = client.getPort(isReadPort);
+				auto client_port = client->getPort(isReadPort);
 				if (client_port != -1 && client_port == port) return true;
 			}
 			return false;
@@ -370,19 +279,6 @@ int Server::initSockets() {
 }
 
 
-// Каждые 5 секунд очищать неактивных клиентов
-void Server::inactiveClientsCleaner() {
-	// Задать имя потоку
-	setThreadDesc(L"[Server][Cleaner]");
-
-	while (isRunning() && cleanerStarted) {
-		cleanInactiveClients();
-
-		Sleep(5000);
-	}
-}
-
-
 // Обработка входящих подключений
 void Server::processIncomeConnection(bool isReadSocket)
 {
@@ -448,26 +344,50 @@ void Server::processIncomeConnection(bool isReadSocket)
 		uint32_t client_ip   = clientDesc.sin_addr.s_addr;
 		uint16_t client_port = ntohs(clientDesc.sin_port);
 
-		// Получаем итератор
-		auto client_it = getClientByIP(false, client_ip);
-
 		clients_mutex.lock();
 
-		auto end = clientPool.cend();
-		if (!isReadSocket && client_it == end) {
-			// Такого клиента нет, добавить и начать рукопожатие
-			auto client = ConnectedClientFactory::create(clientDesc, clientLen);
+		// Получаем итератор
+		ConnectedClientPtr found_client = getClientByIP(false, false, client_ip);
 
-			clientPool[client->getID()] = client;
+		if (!isReadSocket) {
+			if (!found_client) {
+				// Такого клиента нет, добавить и начать рукопожатие
+				auto client = ConnectedClientFactory::create(clientDesc, clientLen);
 
-			client->first_handshake(clientSocket, client_port);
+				clientPool[client->getID()] = client;
+
+				client->first_handshake(clientSocket, client_port);
+			}
+			else {
+				// Уже есть клиент с таким же IP
+				if (!found_client->isRunning()) {
+					// Если было когда-то разорвано соединение
+					if (!found_client->isDisconnected())
+						found_client->disconnect();
+					// Начать новое рукопожатие
+					found_client->first_handshake(clientSocket, client_port);
+				}
+				else {
+					// Ошибка, сбросить соединение
+					shutdown(clientSocket, SD_BOTH);
+					closesocket(clientSocket);
+				}
+			}
 		}
-		else if (isReadSocket && client_it != end) {
-			// Уже есть клиент с таким же IP, продолжить рукопожатие
-			ConnectedClient& client = *(client_it->second);
-
-			if (!client.isRunning())
-				client.second_handshake(clientSocket, client_port);
+		else if (isReadSocket && found_client) {
+			// Уже есть клиент с таким же IP
+			if (!found_client->isRunning()) {
+				// Если было когда-то разорвано соединение
+				if (!found_client->isDisconnected())
+					found_client->disconnect();
+				// Продолжить рукопожатие
+				found_client->second_handshake(clientSocket, client_port);
+			}
+			else {
+				// Ошибка, сбросить соединение
+				shutdown(clientSocket, SD_BOTH);
+				closesocket(clientSocket);
+			}
 		}
 		else {
 			// Ошибка, сбросить соединение

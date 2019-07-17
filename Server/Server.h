@@ -2,8 +2,8 @@
 #include <map>
 #include <mutex>
 #include <thread>
-#include "ConnectedClient.h"
 #include "Common.h"
+#include "ConnectedClient.h"
 
 enum class ServerState {
 	InitWinSock,
@@ -17,31 +17,23 @@ enum class ServerState {
 	CloseSockets
 };
 
-enum class CleanerMode {
-	OnlyDisconnect,
-	AgressiveMode
-};
-
 typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
 
 typedef ClientPool::iterator       ConnectedClientIter;
 typedef ClientPool::const_iterator ConnectedClientConstIter;
 
+// Синглтон сервера
 class Server {
 public:
-	Server(uint16_t readPort, uint16_t writePort);
-	~Server();
+	static Server& getInstance() {
+		static Server instance;
+		return instance;
+	}
 
 	ClientPool clientPool;
 
-	int  startServer();
+	int  startServer(uint16_t readPort, uint16_t writePort);
 	void closeServer();
-
-	void startCleaner();
-	void printCleanerCommands();
-	void printCleanerMode();
-	void cleanInactiveClients(bool ext = false);
-	void closeCleaner();
 
 	bool isRunning() { return started; }
 
@@ -50,10 +42,10 @@ public:
 
 	int processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler);
 
-	ConnectedClientConstIter findClientIter(bool onlyActive, std::function<bool(ConnectedClient&)> handler);
+	ConnectedClientPtr findClient(bool lockMutex, bool onlyActive, std::function<bool(ConnectedClientPtr)> handler);
 
-	ConnectedClientConstIter getClientByID(bool onlyActive, uint32_t ID);
-	ConnectedClientConstIter getClientByIP(bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
+	ConnectedClientPtr getClientByID(bool lockMutex, bool onlyActive, uint32_t ID);
+	ConnectedClientPtr getClientByIP(bool lockMutex, bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
 
 	std::mutex clients_mutex;
 private:
@@ -61,27 +53,25 @@ private:
 
 	int initSockets();
 
-	void inactiveClientsCleaner();
-
 	void processIncomeConnection(bool isReadSocket);
 
 	void setState(ServerState state);
 
-	std::thread cleaner;
-
 	std::thread firstHandshakesHandler;
 	std::thread secondHandshakesHandler;
 
-	bool started;
-	bool cleanerStarted;
+	bool started = false;
 
-	
 	ServerState state;
-	CleanerMode cleanerMode;
 
 	uint16_t readPort;
 	uint16_t writePort;
 
 	SOCKET listeningReadSocket;
 	SOCKET listeningWriteSocket;
+
+	// Защита от копирования
+	Server()                   {}
+	Server(const Server&)      {}
+	Server& operator=(Server&) {}
 };

@@ -50,6 +50,7 @@ public:
 
 typedef std::shared_ptr<Packet> PacketPtr;
 
+// Синглтон фабрики пакетов
 class PacketFactory {
 public:
 	static PacketPtr create(const char* data, size_t size, bool needACK) {
@@ -63,8 +64,8 @@ private:
 	}
 
 	// Защита от копирования
-	PacketFactory() {}
-	PacketFactory(const PacketFactory&) {}
+	PacketFactory()                          {}
+	PacketFactory(const PacketFactory&)      {}
 	PacketFactory& operator=(PacketFactory&) {}
 };
 

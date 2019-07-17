@@ -128,6 +128,8 @@ int Client::handshake() {
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
+	Sleep(500); // Задержка нужна для того, чтобы сервер успел принять соединение
+
 	// Create a write socket that sending data to the server
 	setState(ClientState::CreateWriteSocket);
 
