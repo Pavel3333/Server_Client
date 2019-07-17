@@ -41,25 +41,66 @@ void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 }
 
 // Второе рукопожатие с соединенным клиентом
-void ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
+int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 {
 	// Присвоить сокет на чтение
-	// Отправить Hello пакет и ожидать ответ
+	// Отправить Hello пакет
+	// Принять Hello пакет от клиента и обработать
 	// Создать потоки-обработчики
 	setState(ClientState::SecondHandshake);
 
 	writePort  = port;
 	readSocket = socket;
 
-	// TODO: Отправить Hello пакет и ожидать ответ
+	setState(ClientState::HelloSending);
 
-	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
-	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
+	ServerHelloPacket serverHelloRaw { ID };
+
+	PacketPtr serverHello = PacketFactory::create(reinterpret_cast<const char*>(&serverHelloRaw), sizeof(serverHelloRaw), true);
+
+	if (sendData(serverHello))
+		return 1;
+
+	setState(ClientState::HelloReceiving);
+
+	PacketPtr clientHello;
+
+	started = true;
+	int err = receiveData(clientHello, true);
+	started = false;
+
+	if (err > 0)
+		// Критическая ошибка или соединение сброшено
+		return 2;
+
+	// Обработка пакета
+
+	if (!clientHello)
+		// Пришел пустой пакет
+		return 3;
+	else if (clientHello->getDataSize() != sizeof(ClientHelloPacket))
+		// Пакет не совпадает по размеру
+		return 4;
+
+	ClientHelloPacket clientHelloRaw;
+	memcpy(&clientHelloRaw, clientHello->getData(), clientHello->getDataSize());
+
+	if (clientHelloRaw.serverHelloPacketID != serverHello->getID())
+		// Пришедший ID пакета от сервера
+		// не совпадает с реальным значением
+		return 5;
+
+	// TODO: записать пришедший от клиента логин и отобразить
 
 	started = true;
 	disconnected = false;
 
+	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
+	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
+
 	createThreads();
+
+	return 0;
 }
 
 
@@ -161,7 +202,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet) {
 	if (sendData(packet))
 		return 1;
 
-	if (packet->needACK) {                                                         // Если нужно подтверждение отправленного пакета
+	if (packet->isNeedACK()) {                                                     // Если нужно подтверждение отправленного пакета
 		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
 			std::bind(&ConnectedClient::ack_handler, this, std::placeholders::_1),
 			true                                                                   // Таймаут 3 секунды
@@ -228,7 +269,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->ID);
+				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -239,7 +280,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->ID);
+				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -290,10 +331,9 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		// - после таймаута (см. closeAfterTimeout)
 
 		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
-
 		if      (respSize > 0) {
 			// Записываем данные от клиента
-			dest = PacketFactory::create(respBuff.data(), respSize, false);
+			dest = PacketFactory::create(respBuff.data(), respSize);
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);
@@ -363,6 +403,8 @@ void ConnectedClient::setState(ClientState state)
 	switch (state) {
 		PRINT_STATE(FirstHandshake);
 		PRINT_STATE(SecondHandshake);
+		PRINT_STATE(HelloSending);
+		PRINT_STATE(HelloReceiving);
 		PRINT_STATE(Send);
 		PRINT_STATE(Receive);
 		PRINT_STATE(Shutdown);
@@ -377,22 +419,6 @@ void ConnectedClient::setState(ClientState state)
 #endif
 
 	this->state = state;
-}
-
-
-std::ostream& operator<< (std::ostream& os, const Packet& packet)
-{
-	os << "    {"                           << "\n";
-	os << "    ID     : " << packet.ID      << "\n";
-	os << "    size   : " << packet.size()  << "\n";
-	os << "    needACK: " << packet.needACK << "\n";
-
-	os << "    data   : ";
-	os.write(packet.data(), packet.size());
-	os << "\n";
-
-	os << "    }" << endl;
-	return os;
 }
 
 std::ostream& operator<< (std::ostream& os, ConnectedClient& client)

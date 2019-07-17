@@ -15,12 +15,14 @@ enum class ERROR_TYPE {
 
 enum class ClientState {
 	InitWinSock,
+	SetOpts,
 	CreateReadSocket,
 	CreateWriteSocket,
-	SetOpts,
+	HelloReceiving,
+	HelloSending,
 	Send,
-	Shutdown,
 	Receive,
+	Shutdown,
 	CloseSocket
 };
 
@@ -39,8 +41,10 @@ public:
 	void disconnect();
 
 	bool isRunning() const {
-		return started && readSocket != INVALID_SOCKET
+		return started && readSocket  != INVALID_SOCKET
 			           && writeSocket != INVALID_SOCKET; }
+
+	uint16_t getID() const { return ID; }
 
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 
@@ -70,6 +74,8 @@ private:
 	std::thread sender;
 
 	ClientState state;
+
+	uint16_t ID;
 
 	PCSTR IP;
 

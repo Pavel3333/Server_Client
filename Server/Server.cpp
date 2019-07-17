@@ -381,7 +381,14 @@ void Server::processIncomeConnection(bool isReadSocket)
 				if (!found_client->isDisconnected())
 					found_client->disconnect();
 				// Продолжить рукопожатие
-				found_client->second_handshake(clientSocket, client_port);
+				int err = found_client->second_handshake(clientSocket, client_port);
+				if (err) {
+					// В случае ошибки выводим код ошибки и сбрасываем соединение
+					log_colored(ConsoleColor::DangerHighlighted, "Client %d: second handshake failed: error %d", err);
+					shutdown(clientSocket, SD_BOTH);
+					closesocket(clientSocket);
+				}
+					
 			}
 			else {
 				// Ошибка, сбросить соединение

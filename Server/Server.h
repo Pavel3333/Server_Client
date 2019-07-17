@@ -19,9 +19,6 @@ enum class ServerState {
 
 typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
 
-typedef ClientPool::iterator       ConnectedClientIter;
-typedef ClientPool::const_iterator ConnectedClientConstIter;
-
 // Синглтон сервера
 class Server {
 public:

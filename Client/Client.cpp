@@ -7,6 +7,7 @@ Client::Client(PCSTR IP, uint16_t readPort, uint16_t writePort)
 	, writeSocket(INVALID_SOCKET)
 	, readPort(readPort)
 	, writePort(writePort)
+	, ID(0)
 	, IP(IP)
 	, started(false)
 {
@@ -29,8 +30,10 @@ int Client::init() {
 		return 1;
 	}
 
-	if (err = handshake())
+	if (err = handshake()) {
+		started = false;
 		return err;
+	}
 
 	return 0;
 }
@@ -141,9 +144,45 @@ int Client::handshake() {
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
+	// Receive a Hello packet from the server
+	setState(ClientState::HelloReceiving);
+
+	PacketPtr serverHello;
+
+	started = true;
+	int err = receiveData(serverHello, false);
+	started = false;
+	if (err > 0)
+		// Критическая ошибка или соединение сброшено
+		return 1;
+
+	// Обработка пакета
+
+	if (!serverHello)
+		// Пришел пустой пакет
+		return 2;
+	else if (serverHello->getDataSize() != sizeof(ServerHelloPacket))
+		// Пакет не совпадает по размеру
+		return 3;
+
+	ServerHelloPacket serverHelloRaw;
+	memcpy(&serverHelloRaw, serverHello->getData(), serverHello->getDataSize());
+
+	ID = serverHelloRaw.clientID;
+
+	// Send a Hello packet to the server
+	setState(ClientState::HelloSending);
+
+	ClientHelloPacket clientHelloRaw { serverHello->getID(), "My login" }; // TODO: сделать получение логина перед созданием клиента
+
+	PacketPtr clientHello = PacketFactory::create(reinterpret_cast<const char*>(&clientHelloRaw), sizeof(clientHelloRaw), true);
+
+	if (sendData(clientHello))
+		return 1;
+
 	started = true;
 
-	//TODO: Принять Hello пакет от сервера, отправить в ответ серверу Hello пакет
+	log_colored(ConsoleColor::SuccessHighlighted, "Client handshaked successfully! Client ID: %d", ID);
 
 	createThreads();
 
@@ -185,7 +224,7 @@ int Client::handlePacketOut(PacketPtr packet) {
 	if (sendData(packet))
 		return 1;
 
-	if (packet->needACK) {                                                         // Если нужно подтверждение отправленного пакета
+	if (packet->isNeedACK()) {                                                     // Если нужно подтверждение отправленного пакета
 		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
 			std::bind(&Client::ack_handler, this, std::placeholders::_1),
 			true                                                                   // Таймаут 3 секунды
@@ -252,7 +291,7 @@ void Client::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->ID);
+				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -263,7 +302,7 @@ void Client::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->ID);
+				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -314,10 +353,9 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		// - после таймаута (см. closeAfterTimeout)
 
 		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
-
 		if      (respSize > 0) {
 			// Записываем данные от сервера
-			dest = PacketFactory::create(respBuff.data(), respSize, false);
+			dest = PacketFactory::create(respBuff.data(), respSize);
 
 			// Добавить пакет
 			receivedPackets.push_back(dest);
@@ -386,12 +424,14 @@ void Client::setState(ClientState state)
 
 	switch (state) {
 		PRINT_STATE(InitWinSock);
+		PRINT_STATE(SetOpts);
 		PRINT_STATE(CreateReadSocket);
 		PRINT_STATE(CreateWriteSocket);
-		PRINT_STATE(SetOpts);
+		PRINT_STATE(HelloReceiving);
+		PRINT_STATE(HelloSending);
 		PRINT_STATE(Send);
-		PRINT_STATE(Shutdown);
 		PRINT_STATE(Receive);
+		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSocket);
 	default:
 		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);

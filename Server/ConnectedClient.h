@@ -9,6 +9,8 @@
 enum class ClientState : uint8_t {
 	FirstHandshake,
 	SecondHandshake,
+	HelloSending,
+	HelloReceiving,
 	Send,
 	Receive,
 	Shutdown,
@@ -27,7 +29,7 @@ public:
 	std::vector<PacketPtr> syncPackets;
 
 	void first_handshake(SOCKET socket, uint16_t port);
-	void second_handshake(SOCKET socket, uint16_t port);
+	int second_handshake(SOCKET socket, uint16_t port);
 
 	bool isRunning() const {
 		return started && readSocket  != INVALID_SOCKET

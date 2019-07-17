@@ -38,24 +38,41 @@ void log(const char* fmt, ...);
 class Packet: public std::vector<char> {
 public:
 	Packet(uint32_t ID, const char* data, size_t size, bool needACK);
+	Packet(const char* data, size_t size);
 	~Packet() = default;
 
-	uint32_t ID;
-	bool needACK;
+	uint32_t getID()     const { return header.ID; }
+	bool     isNeedACK() const { return header.needACK; }
+
+	const char* getData() const { return this->data() + sizeof(header); }
+	size_t getDataSize()  const { return header.fullsize - sizeof(header); }
 
 	int send(SOCKET s) {
 		return ::send(s, data(), static_cast<int>(size()), 0);
 	}
+private:
+	struct packet_header {
+		size_t fullsize;
+		uint32_t ID;
+		bool needACK;
+	} header;
 };
 
+std::ostream& operator<< (std::ostream& os, Packet& packet);
+
+
 typedef std::shared_ptr<Packet> PacketPtr;
+
+using std::make_shared;
 
 // Синглтон фабрики пакетов
 class PacketFactory {
 public:
 	static PacketPtr create(const char* data, size_t size, bool needACK) {
-		using std::make_shared;
 		return make_shared<Packet>(getID(), data, size, needACK);
+	}
+	static PacketPtr create(const char* data, size_t size) {
+		return make_shared<Packet>(data, size);
 	}
 private:
 	static std::atomic_uint getID() {
@@ -69,7 +86,16 @@ private:
 	PacketFactory& operator=(PacketFactory&) {}
 };
 
-std::ostream& operator<< (std::ostream& os, Packet& packet);
+// Hello-пакеты
+
+struct ServerHelloPacket {
+	uint16_t clientID;
+};
+
+struct ClientHelloPacket {
+	uint32_t serverHelloPacketID;
+	char     login[16];
+};
 
 
 // Print WSA errors

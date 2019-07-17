@@ -74,19 +74,34 @@ void log(const char* fmt, ...) {
 
 
 Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
-	: std::vector<char>(size)
-	, ID(ID)
-	, needACK(needACK)
+	: std::vector<char>()
 {
-	memcpy(this->data(), data, size);
+	header = {
+		sizeof(packet_header) + size,
+		ID,
+		needACK
+	};
+	this->resize(header.fullsize);
+
+	char* pointer = this->data();
+	memcpy(pointer, &header, sizeof(header));
+	pointer += sizeof(header);
+	memcpy(pointer, data, size);
+}
+
+Packet::Packet(const char* data, size_t size)
+	: std::vector<char>(size)
+{
+	memcpy(this->data(),    data, size);
+	memcpy(&(this->header), data, sizeof(packet_header));
 }
 
 std::ostream& operator<< (std::ostream& os, Packet& packet)
 {
 	os << "{" << endl
-		<< "  ID     : " << packet.ID << endl
-		<< "  size   : " << packet.size() << endl
-		<< "  needACK: " << packet.needACK << endl
+		<< "  ID     : " << packet.getID()     << endl
+		<< "  size   : " << packet.size()      << endl
+		<< "  needACK: " << packet.isNeedACK() << endl
 		<< "  data   : \"";
 
 	os.write(packet.data(), packet.size());
