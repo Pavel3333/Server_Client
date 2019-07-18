@@ -23,34 +23,45 @@ int start() {
 			err = false;
 	}
 
-	Client client { cmd, SERVER_IP, READ_PORT, WRITE_PORT };
+	uint8_t ctr_reconnect = 1;
 
-	if (client.init())
-		return 1;
+	while (ctr_reconnect <= 5) {
+		if (Client::getInstance().init(cmd, SERVER_IP, READ_PORT, WRITE_PORT))
+			return 1;
 
-	client.printCommandsList();
+		Client::getInstance().printCommandsList();
 
-	while (client.isRunning()) { // Прием команд из командной строки
-		std::cin >> cmd;
-		std::cin.ignore();
+		log_colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
 
-		if      (cmd == "send") { // Отправка данных серверу
-			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+		while (Client::getInstance().isRunning()) { // Прием команд из командной строки
+			std::cin >> cmd;
+			std::cin.ignore();
 
-			std::getline(std::cin, cmd);
+			if (cmd == "send") { // Отправка данных серверу
+				log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
-			client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+				std::getline(std::cin, cmd);
+
+				Client::getInstance().sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+			}
+			else if (cmd == "commands") { // Вывод всех доступных команд
+				Client::getInstance().printCommandsList();
+			}
+			else if (cmd == "close") { // Закрытие клиента
+				Client::getInstance().disconnect();
+				return 0;
+			}
 		}
-		else if (cmd == "commands") { // Вывод всех доступных команд
-			client.printCommandsList();
-		}
-		else if (cmd == "close") { // Закрытие клиента
-			client.disconnect();
+
+		if (!Client::getInstance().isRunning()) {
+			Client::getInstance().disconnect();
+
+			ctr_reconnect++;
 		}
 	}
 
-	if (!client.isRunning())
-		client.disconnect();
+	if (ctr_reconnect > 5)
+		log_raw_colored(ConsoleColor::DangerHighlighted, "Too many connection attempts. Contact the developers");
 
 	return 0;
 }
@@ -62,6 +73,8 @@ int main()
 
 	if (int err = start())
 		log_colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);
+
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of client");
 
 	int v;
 	std::cin >> v; // Чтобы не закрывалось окно

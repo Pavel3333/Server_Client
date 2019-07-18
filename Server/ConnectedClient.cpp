@@ -27,13 +27,6 @@ ConnectedClient::~ConnectedClient() {
 }
 
 
-void ConnectedClient::resetSocketsAndPorts() {
-	readSocket  = INVALID_SOCKET;
-	writeSocket = INVALID_SOCKET;
-	readPort  = -1;
-	writePort = -1;
-}
-
 // Первое рукопожатие с соединенным клиентом
 void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 {
@@ -121,6 +114,15 @@ void ConnectedClient::createThreads()
 	sender   = std::thread(&ConnectedClient::senderThread,   this);
 }
 
+// Сброс портов и сокетов
+void ConnectedClient::resetSocketsAndPorts()
+{
+	readSocket = INVALID_SOCKET;
+	writeSocket = INVALID_SOCKET;
+	readPort = -1;
+	writePort = -1;
+}
+
 
 void ConnectedClient::getInfo(bool ext)
 {
@@ -140,7 +142,8 @@ void ConnectedClient::getInfo(bool ext)
 	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
 }
 
-bool ConnectedClient::disconnect() {
+bool ConnectedClient::disconnect()
+{
 	if (!started || disconnected)
 		return false;
 
@@ -203,7 +206,8 @@ int ConnectedClient::any_packet_handler(PacketPtr packet)
 
 
 // Обработка входящего пакета
-int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout) {
+int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout)
+{
 	PacketPtr packet;
 
 	int err = receiveData(packet, closeAfterTimeout);
@@ -217,7 +221,8 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool 
 }
 
 // Обработка исходящего пакета
-int ConnectedClient::handlePacketOut(PacketPtr packet) {
+int ConnectedClient::handlePacketOut(PacketPtr packet)
+{
 	if (sendData(packet))
 		return 1;
 
@@ -236,7 +241,8 @@ int ConnectedClient::handlePacketOut(PacketPtr packet) {
 
 
 // Поток обработки входящих пакетов
-void ConnectedClient::receiverThread() {
+void ConnectedClient::receiverThread()
+{
 	// Задать имя потоку
 	setThreadDesc(L"[Client %d][Receiver]", ID);
 
@@ -388,7 +394,8 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 }
 
 // Отправка данных
-int ConnectedClient::sendData(PacketPtr packet) {
+int ConnectedClient::sendData(PacketPtr packet)
+{
 	setState(ClientState::Send);
 
 	if (packet->send(writeSocket) == SOCKET_ERROR) {

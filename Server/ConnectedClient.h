@@ -22,18 +22,12 @@ public:
 	ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int clientLen);
 	~ConnectedClient();
 
-	std::vector<PacketPtr> receivedPackets;
-	std::vector<PacketPtr> sendedPackets;
-
-	std::queue<PacketPtr> mainPackets;
-	std::vector<PacketPtr> syncPackets;
-
-	void resetSocketsAndPorts();
-
 	void first_handshake(SOCKET socket, uint16_t port);
 	int second_handshake(SOCKET socket, uint16_t port);
 
 	void createThreads();
+
+	void resetSocketsAndPorts();
 
 	// Getters
 	bool isRunning() const {
@@ -62,7 +56,12 @@ public:
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 	bool disconnect();
 
+	// Instances
+	std::vector<PacketPtr> receivedPackets;
+	std::vector<PacketPtr> sendedPackets;
 
+	std::queue<PacketPtr> mainPackets;
+	std::vector<PacketPtr> syncPackets;
 private:
 	sockaddr_in clientDesc;
 	SOCKET readSocket;

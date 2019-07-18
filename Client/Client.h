@@ -28,18 +28,17 @@ enum class ClientState {
 
 class Client {
 public:
-	Client(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort);
-	~Client();
+	static Client& getInstance() {
+		static Client instance;
+		return instance;
+	}
 
-	std::vector<PacketPtr> receivedPackets;
-	std::vector<PacketPtr> sendedPackets;
-
-	std::queue<PacketPtr>  mainPackets;
-	std::vector<PacketPtr> syncPackets;
-
-	int init();
+	int init(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort);
 	void disconnect();
 
+	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
+
+	// Getters
 	bool isRunning() const {
 		return started && readSocket  != INVALID_SOCKET
 			           && writeSocket != INVALID_SOCKET; }
@@ -47,9 +46,16 @@ public:
 	uint16_t         getID()    const { return ID; }
 	std::string_view getLogin() const { return login; }
 
-	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
-
+	// Other methods
 	void printCommandsList() const;
+
+	// Instances
+
+	std::vector<PacketPtr> receivedPackets;
+	std::vector<PacketPtr> sendedPackets;
+
+	std::queue<PacketPtr>  mainPackets;
+	std::vector<PacketPtr> syncPackets;
 private:
 	SOCKET connect2server(uint16_t port);
 

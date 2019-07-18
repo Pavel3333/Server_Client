@@ -87,7 +87,7 @@ void Server::closeServer()
 }
 
 
-void Server::printCommandsList()
+void Server::printCommandsList() const
 {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
 	log_raw_colored(ConsoleColor::Info,            "  \"list\"          => Print list of all active clients");
@@ -98,21 +98,6 @@ void Server::printCommandsList()
 	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
 	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
 	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
-}
-
-// Получение числа активных клиентов
-size_t Server::getActiveClientsCount()
-{
-	size_t counter = 0;
-
-	size_t* ctr_ptr = &counter;
-
-	processClientsByPair(
-		true, // Увеличивать counter только для активных клиентов
-		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
-	);
-
-	return counter;
 }
 
 
@@ -133,6 +118,21 @@ int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedCli
 
 	clients_mutex.unlock();
 	return err;
+}
+
+// Получение числа активных клиентов
+size_t Server::getActiveClientsCount()
+{
+	size_t counter = 0;
+
+	size_t* ctr_ptr = &counter;
+
+	processClientsByPair(
+		true, // Увеличивать counter только для активных клиентов
+		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
+	);
+
+	return counter;
 }
 
 // Нахождение клиента, удовлетворяющего условию
@@ -212,7 +212,8 @@ ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, uin
 }
 
 
-SOCKET Server::initSocket(uint16_t port) {
+SOCKET Server::initSocket(uint16_t port)
+{
 	SOCKET result = INVALID_SOCKET;
 
 	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -268,7 +269,8 @@ SOCKET Server::initSocket(uint16_t port) {
 	return result;
 }
 
-int Server::initSockets() {
+int Server::initSockets()
+{
 	// Create a read socket that receiving data from server
 	setState(ServerState::CreateReadSocket);
 

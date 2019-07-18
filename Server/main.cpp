@@ -145,6 +145,8 @@ int main()
 	if (int err = start())
 		log_colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
 
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of server");
+
 	int v;
 	std::cin >> v; // Чтобы не закрывалось окно
 

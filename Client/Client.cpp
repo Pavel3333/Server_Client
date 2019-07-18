@@ -2,24 +2,19 @@
 #include <array>
 #include "Client.h"
 
-Client::Client(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort)
-	: readSocket(INVALID_SOCKET)
-	, writeSocket(INVALID_SOCKET)
-	, readPort(readPort)
-	, writePort(writePort)
-	, ID(0)
-	, login(login)
-	, IP(IP)
-	, started(false)
+int Client::init(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort)
 {
-}
+	// Init class members
+	this->readSocket = INVALID_SOCKET;
+	this->writeSocket = INVALID_SOCKET;
 
-Client::~Client() {
-	disconnect();
-}
+	this->readPort = readPort;
+	this->writePort = writePort;
+	this->ID = 0;
+	this->login = login;
+	this->IP = IP;
+	this->started = false;
 
-
-int Client::init() {
 	// Initialize Winsock
 	setState(ClientState::InitWinSock);
 
@@ -37,7 +32,8 @@ int Client::init() {
 	return 0;
 }
 
-void Client::disconnect() {
+void Client::disconnect()
+{
 	if (!started)
 		return;
 
@@ -65,7 +61,8 @@ void Client::disconnect() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 }
 
-void Client::printCommandsList() const {
+void Client::printCommandsList() const
+{
 	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
 	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
 	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
@@ -73,7 +70,8 @@ void Client::printCommandsList() const {
 }
 
 
-SOCKET Client::connect2server(uint16_t port) {
+SOCKET Client::connect2server(uint16_t port)
+{
 	SOCKET result = INVALID_SOCKET;
 
 	sockaddr_in socketDesc;
@@ -118,7 +116,8 @@ SOCKET Client::connect2server(uint16_t port) {
 	return result;
 }
 
-int Client::handshake() {
+int Client::handshake()
+{
 	// Create a read socket that receiving data from server
 	setState(ClientState::CreateReadSocket);
 
@@ -205,7 +204,8 @@ int Client::any_packet_handler(PacketPtr packet)
 
 
 // Обработка входящего пакета
-int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout) {
+int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout)
+{
 	PacketPtr packet;
 
 	int err = receiveData(packet, closeAfterTimeout);
@@ -219,7 +219,8 @@ int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfte
 }
 
 // Обработка исходящего пакета
-int Client::handlePacketOut(PacketPtr packet) {
+int Client::handlePacketOut(PacketPtr packet)
+{
 	if (sendData(packet))
 		return 1;
 
@@ -238,7 +239,8 @@ int Client::handlePacketOut(PacketPtr packet) {
 
 
 // Поток обработки входящих пакетов
-void Client::receiverThread() {
+void Client::receiverThread()
+{
 	// Задать имя потоку
 	setThreadDesc(L"[Receiver]");
 
@@ -397,7 +399,8 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 }
 
 // Отправка данных
-int Client::sendData(PacketPtr packet) {
+int Client::sendData(PacketPtr packet)
+{
 	setState(ClientState::Send);
 
 	if (packet->send(writeSocket) == SOCKET_ERROR) {
