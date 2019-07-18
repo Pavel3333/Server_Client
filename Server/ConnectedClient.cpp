@@ -27,6 +27,13 @@ ConnectedClient::~ConnectedClient() {
 }
 
 
+void ConnectedClient::resetSocketsAndPorts() {
+	readSocket  = INVALID_SOCKET;
+	writeSocket = INVALID_SOCKET;
+	readPort  = -1;
+	writePort = -1;
+}
+
 // Первое рукопожатие с соединенным клиентом
 void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 {
@@ -95,15 +102,9 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 
 	login = std::string_view(clientHelloRaw.login, clientHelloRaw.loginSize);
 
-	started = true;
-	disconnected = false;
-
 	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
-
-	// Создать потоки-обработчики
-	createThreads();
 
 	return 0;
 }
@@ -111,6 +112,9 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 // Создание потоков
 void ConnectedClient::createThreads()
 {
+	started      = true;
+	disconnected = false;
+
 	receiver = std::thread(&ConnectedClient::receiverThread, this);
 	sender   = std::thread(&ConnectedClient::senderThread,   this);
 }

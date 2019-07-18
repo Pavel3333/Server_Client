@@ -193,16 +193,20 @@ ConnectedClientPtr Server::getClientByIP(bool lockMutex, bool onlyActive, uint32
 		});
 }
 
-// Получить указатель на клиента по IP (возможно, с портом)
-ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, std::string_view login)
+// Получить указатель на клиента по логину
+// Если указан clientID - исключает пользователя с таким ID
+ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, std::string_view login, int16_t clientID)
 {
 	return findClient(
 		lockMutex,
 		onlyActive,
-		[login](ConnectedClientPtr client) -> bool
+		[login, clientID](ConnectedClientPtr client) -> bool
 	{
 		// Проверка по логину
-		if (client->getLogin() == login) return true;
+		if (client->getLogin() == login) {
+			if (clientID != -1 && client->getID() == clientID) return false;
+			return true;
+		}
 		return false;
 	});
 }
@@ -403,21 +407,37 @@ void Server::processIncomeConnection(bool isReadSocket)
 					closesocket(clientSocket);
 				}
 				else {
-					// Ищем клиент с таким же логином
-					ConnectedClientPtr found_client_same_login = getClientByLogin(false, false, found_client_same_IP->getLogin());
+					std::string_view login = found_client_same_IP->getLogin();
+
+					// Ищем клиент с таким же логином, но с другим ID
+					ConnectedClientPtr found_client_same_login = getClientByLogin(false, false, login, found_client_same_IP->getID());
 
 					if (!found_client_same_login)
 						// Клиент не найден - создаем потоки-обработчики пакетов
 						found_client_same_IP->createThreads();
 					else if(!found_client_same_login->isRunning()) {
-						// Есть клиент с таким же логином, но с разорванным соединением
+						// Есть клиент с таким же логином, но с разорванным соединением и другим ID
+						log_colored(ConsoleColor::InfoHighlighted, "Client %d: found stopped client %d with same login %.*s", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
+						// Перенести порты
+						found_client_same_login->setPort(false, found_client_same_IP->getPort(false));
+						found_client_same_login->setPort(true,  found_client_same_IP->getPort(true));
+						// Перенести сокеты
+						found_client_same_login->setSocket(false, found_client_same_IP->getSocket(false));
+						found_client_same_login->setSocket(true,  found_client_same_IP->getSocket(true));
 
-						// TODO: перенести порты и сокеты в клиента с таким же логином
-						// TODO: Старый клиент дисконнектнуть, сбросив порты и сокеты
+						// Присвоить невалидные порты и сокеты
+						found_client_same_IP->resetSocketsAndPorts();
+						// Дисконнект
+						found_client_same_IP->disconnect();
+
+						// Восстановить работу клиента с найденным логином
+						found_client_same_IP->createThreads();
 					}
 					else {
 						// Уже подключен клиент с таким логином
 						// Сбрасываем соединение
+						log_colored(ConsoleColor::WarningHighlighted, "Client %d: Already exists running client %d with same login %.*s, closing connection...", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
+
 						shutdown(clientSocket, SD_BOTH);
 						closesocket(clientSocket);
 					}

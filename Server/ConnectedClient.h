@@ -28,11 +28,14 @@ public:
 	std::queue<PacketPtr> mainPackets;
 	std::vector<PacketPtr> syncPackets;
 
+	void resetSocketsAndPorts();
+
 	void first_handshake(SOCKET socket, uint16_t port);
 	int second_handshake(SOCKET socket, uint16_t port);
 
 	void createThreads();
 
+	// Getters
 	bool isRunning() const {
 		return started && readSocket  != INVALID_SOCKET
 			           && writeSocket != INVALID_SOCKET; }
@@ -46,9 +49,15 @@ public:
 	uint32_t    getIP_u32() const { return IP; }
 	const char* getIP_str() const { return IP_str; }
 
-	int getPort(bool isReadPort) const { return isReadPort ? readPort : writePort; }
+	int    getPort(bool isReadPort)     const { return isReadPort   ? readPort   : writePort; }
+	SOCKET getSocket(bool isReadSocket) const { return isReadSocket ? readSocket : writeSocket; }
 
 	void getInfo(bool ext = false);
+
+	// Setters
+	void setPort(bool isReadPort, int port)          { if (isReadPort)   readPort   = port;   else writePort   = port; }
+	void setSocket(bool isReadSocket, SOCKET socket) { if (isReadSocket) readSocket = socket; else writeSocket = socket; }
+
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
 	bool disconnect();
 
