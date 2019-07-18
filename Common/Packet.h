@@ -65,6 +65,14 @@ public:
 		return make_shared<Packet>(string_view(data, size));
 	}
 
+	template <class T> 
+	static PacketPtr create_from_struct(T &packet, bool needACK) {
+		using std::make_shared;
+
+		return make_shared<Packet>(
+			reinterpret_cast<const char*>(&packet), sizeof(packet), needACK);
+	}
+
 private:
 	static std::atomic_uint getID() {
 		static std::atomic_uint ID;

@@ -164,17 +164,17 @@ int Client::handshake() {
 		// Пакет не совпадает по размеру
 		return 3;
 
-	ServerHelloPacket serverHelloRaw;
-	memcpy(&serverHelloRaw, serverHello->getData(), serverHello->getDataSize());
+	auto serverHelloRaw = reinterpret_cast<const ServerHelloPacket*>(
+		serverHello->getData());
 
-	ID = serverHelloRaw.clientID;
+	ID = serverHelloRaw->clientID;
 
 	// Send a Hello packet to the server
 	setState(ClientState::HelloSending);
 
 	ClientHelloPacket clientHelloRaw { serverHello->getID(), login };
 
-	PacketPtr clientHello = PacketFactory::create(reinterpret_cast<const char*>(&clientHelloRaw), sizeof(clientHelloRaw), true);
+	PacketPtr clientHello = PacketFactory::create_from_struct(clientHelloRaw, true);
 
 	if (sendData(clientHello))
 		return 1;
