@@ -100,7 +100,9 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 		// превышает максимальный
 		return 6;
 
-	login = std::string_view(clientHelloRaw.login, clientHelloRaw.loginSize);
+	login = std::string(clientHelloRaw.login, clientHelloRaw.loginSize);
+	std::hash<std::string> hashObj;
+	loginHash = hashObj(login);
 
 	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
@@ -172,14 +174,14 @@ bool ConnectedClient::disconnect() {
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->data(), packet->size()));
+	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"

@@ -44,7 +44,8 @@ public:
 
 	uint16_t getID() const { return ID; }
 
-	std::string_view getLogin() const { return login; }
+	std::string_view getLogin()     const { return login; }
+	uint32_t         getLoginHash() const { return loginHash; }
 
 	uint32_t    getIP_u32() const { return IP; }
 	const char* getIP_str() const { return IP_str; }
@@ -93,7 +94,8 @@ private:
 	int readPort;
 	int writePort;
 
-	std::string_view login;
+	std::string login;
+	uint32_t loginHash;
 
 	ClientState state;
 

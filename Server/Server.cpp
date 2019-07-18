@@ -195,15 +195,15 @@ ConnectedClientPtr Server::getClientByIP(bool lockMutex, bool onlyActive, uint32
 
 // Получить указатель на клиента по логину
 // Если указан clientID - исключает пользователя с таким ID
-ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, std::string_view login, int16_t clientID)
+ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, uint32_t loginHash, int16_t clientID)
 {
 	return findClient(
 		lockMutex,
 		onlyActive,
-		[login, clientID](ConnectedClientPtr client) -> bool
+		[loginHash, clientID](ConnectedClientPtr client) -> bool
 	{
 		// Проверка по логину
-		if (client->getLogin() == login) {
+		if (client->getLoginHash() == loginHash) {
 			if (clientID != -1 && client->getID() == clientID) return false;
 			return true;
 		}
@@ -407,10 +407,10 @@ void Server::processIncomeConnection(bool isReadSocket)
 					closesocket(clientSocket);
 				}
 				else {
-					std::string_view login = found_client_same_IP->getLogin();
-
 					// Ищем клиент с таким же логином, но с другим ID
-					ConnectedClientPtr found_client_same_login = getClientByLogin(false, false, login, found_client_same_IP->getID());
+					ConnectedClientPtr found_client_same_login = getClientByLogin(false, false, found_client_same_IP->getLoginHash(), found_client_same_IP->getID());
+
+					std::string_view login = found_client_same_IP->getLogin();
 
 					if (!found_client_same_login)
 						// Клиент не найден - создаем потоки-обработчики пакетов
