@@ -73,27 +73,25 @@ void log(const char* fmt, ...) {
 }
 
 
-Packet::Packet(uint32_t ID, const char* data, size_t size, bool needACK)
+Packet::Packet(uint32_t ID, std::string_view data, bool needACK)
 	: std::vector<char>()
 {
-	header = {
-		sizeof(packet_header) + size,
-		ID,
-		needACK
-	};
-	this->resize(header.fullsize);
+	this->resize(sizeof(packet_header) + data.size());
 
-	char* pointer = this->data();
-	memcpy(pointer, &header, sizeof(header));
-	pointer += sizeof(header);
-	memcpy(pointer, data, size);
+	header = reinterpret_cast<packet_header*>(this->data());
+	header->fullsize = (uint32_t)(sizeof(packet_header) + data.size());
+	header->ID = ID;
+	header->needACK = needACK;
+
+	memcpy(this->data() + sizeof(packet_header), data.data(), data.size());
 }
 
-Packet::Packet(const char* data, size_t size)
-	: std::vector<char>(size)
+
+Packet::Packet(std::string_view data)
+	: std::vector<char>(data.size())
 {
-	memcpy(this->data(),    data, size);
-	memcpy(&(this->header), data, sizeof(packet_header));
+	memcpy(this->data(), data.data(), data.size());
+	this->header = reinterpret_cast<packet_header*>(this->data());
 }
 
 std::ostream& operator<< (std::ostream& os, Packet& packet)

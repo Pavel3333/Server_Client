@@ -77,7 +77,7 @@ private:
 	ClientState state;
 
 	uint16_t ID;
-	std::string_view login;
+	std::string login;
 
 	PCSTR IP;
 

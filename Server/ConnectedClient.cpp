@@ -44,14 +44,12 @@ void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 {
 	// Присвоить сокет на чтение
-	// Отправить Hello пакет
-	// Принять Hello пакет от клиента и обработать
-	// Создать потоки-обработчики
 	setState(ClientState::SecondHandshake);
 
 	writePort  = port;
 	readSocket = socket;
 
+	// Отправить Hello пакет
 	setState(ClientState::HelloSending);
 
 	ServerHelloPacket serverHelloRaw { ID };
@@ -61,6 +59,7 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 	if (sendData(serverHello))
 		return 1;
 
+	// Принять Hello пакет от клиента и обработать
 	setState(ClientState::HelloReceiving);
 
 	PacketPtr clientHello;
@@ -103,6 +102,7 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
 	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
 
+	// Создать потоки-обработчики
 	createThreads();
 
 	return 0;
