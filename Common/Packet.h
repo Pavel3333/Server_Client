@@ -67,9 +67,7 @@ public:
 
 	template <class T> 
 	static PacketPtr create_from_struct(T &packet, bool needACK) {
-		using std::make_shared;
-
-		return make_shared<Packet>(
+		return create(
 			reinterpret_cast<const char*>(&packet), sizeof(packet), needACK);
 	}
 
