@@ -106,25 +106,10 @@ int start()
 			Cleaner::getInstance().startCleaner();
 		}
 		else if (cmd == "get_cleaner_mode") { // Вывести режим работы клинера
-			Cleaner::getInstance().printCleanerMode();
+			Cleaner::getInstance().printMode();
 		}
 		else if (cmd == "change_cleaner_mode") { // Сменить режим работы клинера
-			log_raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
-			log_raw_colored(ConsoleColor::Info,            "  1 - Only disconnect");
-			log_raw_colored(ConsoleColor::Info,            "  2 - Agressive mode");
-
-			std::cin >> cmd;
-
-			if      (cmd == "1")
-				Cleaner::getInstance().changeCleanerMode(CleanerMode::OnlyDisconnect);
-			else if (cmd == "2")
-				Cleaner::getInstance().changeCleanerMode(CleanerMode::AgressiveMode);
-			else {
-				log_raw_colored(ConsoleColor::WarningHighlighted, "Invalid mode was typed");
-				continue;
-			}
-
-			log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
+			Cleaner::getInstance().changeMode();
 		}
 		else if (cmd == "disable_cleaner") { // Выключение клинера
 			Cleaner::getInstance().closeCleaner();

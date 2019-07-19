@@ -17,9 +17,8 @@ public:
 	void closeCleaner();
 
 	void printCommandsList();
-	void printCleanerMode();
-
-	void changeCleanerMode(CleanerMode dest) { mode = dest; }
+	void printMode();
+	void changeMode();
 
 	void cleanInactiveClients(bool ext = false);
 	void inactiveClientsCleaner();
@@ -31,7 +30,6 @@ private:
 	std::thread cleaner;
 
 	// Защита от копирования
-	Cleaner()                    {}
-	Cleaner(const Cleaner&)      {}
-	Cleaner& operator=(Cleaner&) {}
+	Cleaner() {}
+	Cleaner(const Cleaner&) {}
 };
