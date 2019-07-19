@@ -4,7 +4,7 @@
 #include "Cleaner.h"
 #include "Server.h"
 
-// Запуск клинера
+// Г‡Г ГЇГіГ±ГЄ ГЄГ«ГЁГ­ГҐГ°Г 
 void Cleaner::startCleaner()
 {
 	if (started)
@@ -20,11 +20,11 @@ void Cleaner::startCleaner()
 	mode = CleanerMode::OnlyDisconnect;
 
 	log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled!");
-	printCleanerMode();
+	printMode();
 	printCommandsList();
 }
 
-// Отключение клинера
+// ГЋГІГЄГ«ГѕГ·ГҐГ­ГЁГҐ ГЄГ«ГЁГ­ГҐГ°Г 
 void Cleaner::closeCleaner()
 {
 	if (!started)
@@ -40,7 +40,7 @@ void Cleaner::closeCleaner()
 }
 
 
-// Напечатать команды клинера
+// ГЌГ ГЇГҐГ·Г ГІГ ГІГј ГЄГ®Г¬Г Г­Г¤Г» ГЄГ«ГЁГ­ГҐГ°Г 
 void Cleaner::printCommandsList() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the cleaner:");
 	if (!started)
@@ -52,20 +52,46 @@ void Cleaner::printCommandsList() {
 	}
 }
 
-// Напечатать режим работы клинера
-void Cleaner::printCleanerMode() {
+// ГЌГ ГЇГҐГ·Г ГІГ ГІГј Г°ГҐГ¦ГЁГ¬ Г°Г ГЎГ®ГІГ» ГЄГ«ГЁГ­ГҐГ°Г 
+void Cleaner::printMode() {
 	const char* modeDesc = "-";
 
-	if      (mode == CleanerMode::OnlyDisconnect)
-		modeDesc = "Only disconnect";
-	else if (mode == CleanerMode::AgressiveMode)
-		modeDesc = "Agressive mode";
+	switch(mode) {
+		case CleanerMode::OnlyDisconnect:
+			modeDesc = "Only disconnect";
+			break;
+		case CleanerMode::AgressiveMode:
+			modeDesc = "Agressive mode";
+			break;
+		default:
+			modeDesc = "Invalid";
+	}
 
 	log_colored(ConsoleColor::InfoHighlighted, "Cleaner mode: %s", mode);
 }
 
+void Cleaner::changeMode() {
+	CleanerMode cmd;
+	
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
+	log_colored(ConsoleColor::Info,            "  %d - Only disconnect", CleanerMode::OnlyDisconnect);
+	log_colored(ConsoleColor::Info,            "  %d - Agressive mode",  CleanerMode::AgressiveMode);
 
-// Очистка неактивных клиентов
+	std::cin >> cmd;
+
+	switch(cmd) {
+		case CleanerMode::OnlyDisconnect:
+		case CleanerMode::AgressiveMode:
+			mode = cmd;
+			log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
+			break;
+		default:
+			log_raw_colored(ConsoleColor::WarningHighlighted, "Invalid mode was typed");
+	}
+}
+
+
+// ГЋГ·ГЁГ±ГІГЄГ  Г­ГҐГ ГЄГІГЁГўГ­Г»Гµ ГЄГ«ГЁГҐГ­ГІГ®Гў
 void Cleaner::cleanInactiveClients(bool ext)
 {
 	size_t cleaned = 0;
@@ -103,9 +129,9 @@ void Cleaner::cleanInactiveClients(bool ext)
 		log_raw_colored(ConsoleColor::InfoHighlighted, "All clients are active");
 }
 
-// Каждые 5 секунд очищать неактивных клиентов
+// ГЉГ Г¦Г¤Г»ГҐ 5 Г±ГҐГЄГіГ­Г¤ Г®Г·ГЁГ№Г ГІГј Г­ГҐГ ГЄГІГЁГўГ­Г»Гµ ГЄГ«ГЁГҐГ­ГІГ®Гў
 void Cleaner::inactiveClientsCleaner() {
-	// Задать имя потоку
+	// Г‡Г Г¤Г ГІГј ГЁГ¬Гї ГЇГ®ГІГ®ГЄГі
 	setThreadDesc(L"[Server][Cleaner]");
 
 	while (Server::getInstance().isRunning() && started) {

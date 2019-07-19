@@ -5,7 +5,7 @@ enum class CleanerMode {
 	AgressiveMode
 };
 
-// Синглтон клинера
+// Г‘ГЁГ­ГЈГ«ГІГ®Г­ ГЄГ«ГЁГ­ГҐГ°Г 
 class Cleaner {
 public:
 	static Cleaner& getInstance() {
@@ -17,9 +17,8 @@ public:
 	void closeCleaner();
 
 	void printCommandsList();
-	void printCleanerMode();
-
-	void changeCleanerMode(CleanerMode dest) { mode = dest; }
+	void printMode();
+	void changeMode();
 
 	void cleanInactiveClients(bool ext = false);
 	void inactiveClientsCleaner();
@@ -30,7 +29,7 @@ private:
 
 	std::thread cleaner;
 
-	// Защита от копирования
+	// Г‡Г Г№ГЁГІГ  Г®ГІ ГЄГ®ГЇГЁГ°Г®ГўГ Г­ГЁГї
 	Cleaner()                    {}
 	Cleaner(const Cleaner&)      {}
 	Cleaner& operator=(Cleaner&) {}
