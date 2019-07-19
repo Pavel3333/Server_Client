@@ -106,7 +106,7 @@ typedef std::shared_ptr<ConnectedClient> ConnectedClientPtr;
 
 std::ostream& operator<< (std::ostream& os, ConnectedClient& client);
 
-// Синглтон фабрики подключенных к серверу клиентов
+// РЎРёРЅРіР»С‚РѕРЅ С„Р°Р±СЂРёРєРё РїРѕРґРєР»СЋС‡РµРЅРЅС‹С… Рє СЃРµСЂРІРµСЂСѓ РєР»РёРµРЅС‚РѕРІ
 class ConnectedClientFactory
 {
 public:
@@ -115,13 +115,13 @@ public:
 		return make_shared<ConnectedClient>(getID(), clientDesc, clientLen);
 	}
 private:
-	static std::atomic_uint getID() { // Возможно, нужно предварительно обнулять ID?
+	static std::atomic_uint getID() { // Р’РѕР·РјРѕР¶РЅРѕ, РЅСѓР¶РЅРѕ РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕ РѕР±РЅСѓР»СЏС‚СЊ ID?
 		static std::atomic_uint ID;
 
 		return ID++;
 	}
 
-	// Защита от копирования
+	// Р—Р°С‰РёС‚Р° РѕС‚ РєРѕРїРёСЂРѕРІР°РЅРёСЏ
 	ConnectedClientFactory() {}
 	ConnectedClientFactory(const ConnectedClientFactory&) {};
 	ConnectedClientFactory& operator=(ConnectedClientFactory&) {};

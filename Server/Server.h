@@ -19,7 +19,7 @@ enum class ServerState {
 
 typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
 
-// Синглтон сервера
+// РЎРёРЅРіР»С‚РѕРЅ СЃРµСЂРІРµСЂР°
 class Server {
 public:
 	static Server& getInstance() {
@@ -72,7 +72,7 @@ private:
 	SOCKET listeningReadSocket;
 	SOCKET listeningWriteSocket;
 
-	// Защита от копирования
+	// Р—Р°С‰РёС‚Р° РѕС‚ РєРѕРїРёСЂРѕРІР°РЅРёСЏ
 	Server()                   {}
 	Server(const Server&)      {}
 	Server& operator=(Server&) {}

@@ -129,7 +129,7 @@ int Client::handshake()
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
-	Sleep(500); // Задержка нужна для того, чтобы сервер успел принять соединение
+	Sleep(500); // Р—Р°РґРµСЂР¶РєР° РЅСѓР¶РЅР° РґР»СЏ С‚РѕРіРѕ, С‡С‚РѕР±С‹ СЃРµСЂРІРµСЂ СѓСЃРїРµР» РїСЂРёРЅСЏС‚СЊ СЃРѕРµРґРёРЅРµРЅРёРµ
 
 	// Create a write socket that sending data to the server
 	setState(ClientState::CreateWriteSocket);
@@ -151,16 +151,16 @@ int Client::handshake()
 	int err = receiveData(serverHello, false);
 	started = false;
 	if (err > 0)
-		// Критическая ошибка или соединение сброшено
+		// РљСЂРёС‚РёС‡РµСЃРєР°СЏ РѕС€РёР±РєР° РёР»Рё СЃРѕРµРґРёРЅРµРЅРёРµ СЃР±СЂРѕС€РµРЅРѕ
 		return 1;
 
-	// Обработка пакета
+	// РћР±СЂР°Р±РѕС‚РєР° РїР°РєРµС‚Р°
 
 	if (!serverHello)
-		// Пришел пустой пакет
+		// РџСЂРёС€РµР» РїСѓСЃС‚РѕР№ РїР°РєРµС‚
 		return 2;
 	else if (serverHello->getDataSize() != sizeof(ServerHelloPacket))
-		// Пакет не совпадает по размеру
+		// РџР°РєРµС‚ РЅРµ СЃРѕРІРїР°РґР°РµС‚ РїРѕ СЂР°Р·РјРµСЂСѓ
 		return 3;
 
 	auto serverHelloRaw = reinterpret_cast<const ServerHelloPacket*>(
@@ -188,14 +188,14 @@ int Client::handshake()
 }
 
 
-// Обработать пакет ACK
+// РћР±СЂР°Р±РѕС‚Р°С‚СЊ РїР°РєРµС‚ ACK
 int Client::ack_handler(PacketPtr packet)
 {
 	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
-// Обработать любой входящий пакет
+// РћР±СЂР°Р±РѕС‚Р°С‚СЊ Р»СЋР±РѕР№ РІС…РѕРґСЏС‰РёР№ РїР°РєРµС‚
 int Client::any_packet_handler(PacketPtr packet)
 {
 	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
@@ -203,31 +203,31 @@ int Client::any_packet_handler(PacketPtr packet)
 }
 
 
-// Обработка входящего пакета
+// РћР±СЂР°Р±РѕС‚РєР° РІС…РѕРґСЏС‰РµРіРѕ РїР°РєРµС‚Р°
 int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout)
 {
 	PacketPtr packet;
 
 	int err = receiveData(packet, closeAfterTimeout);
 	if (err)
-		return err; // Произошла ошибка
+		return err; // РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°
 
 	if (!packet) return -1;
 
-	// Обработка пришедшего пакета
+	// РћР±СЂР°Р±РѕС‚РєР° РїСЂРёС€РµРґС€РµРіРѕ РїР°РєРµС‚Р°
 	return handler(packet);
 }
 
-// Обработка исходящего пакета
+// РћР±СЂР°Р±РѕС‚РєР° РёСЃС…РѕРґСЏС‰РµРіРѕ РїР°РєРµС‚Р°
 int Client::handlePacketOut(PacketPtr packet)
 {
 	if (sendData(packet))
 		return 1;
 
-	if (packet->isNeedACK()) {                                                     // Если нужно подтверждение отправленного пакета
-		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
+	if (packet->isNeedACK()) {                                                     // Р•СЃР»Рё РЅСѓР¶РЅРѕ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РѕС‚РїСЂР°РІР»РµРЅРЅРѕРіРѕ РїР°РєРµС‚Р°
+		int err = handlePacketIn(                                                  // РџРѕРїСЂРѕР±РѕРІР°С‚СЊ РїСЂРёРЅСЏС‚СЊ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ
 			std::bind(&Client::ack_handler, this, std::placeholders::_1),
-			true                                                                   // Таймаут 3 секунды
+			true                                                                   // РўР°Р№РјР°СѓС‚ 3 СЃРµРєСѓРЅРґС‹
 		);
 
 		if (err)
@@ -238,16 +238,16 @@ int Client::handlePacketOut(PacketPtr packet)
 }
 
 
-// Поток обработки входящих пакетов
+// РџРѕС‚РѕРє РѕР±СЂР°Р±РѕС‚РєРё РІС…РѕРґСЏС‰РёС… РїР°РєРµС‚РѕРІ
 void Client::receiverThread()
 {
-	// Задать имя потоку
+	// Р—Р°РґР°С‚СЊ РёРјСЏ РїРѕС‚РѕРєСѓ
 	setThreadDesc(L"[Receiver]");
 
 	int err = 0;
 
-	// Ожидание любых входящих пакетов
-	// Таймаут не нужен
+	// РћР¶РёРґР°РЅРёРµ Р»СЋР±С‹С… РІС…РѕРґСЏС‰РёС… РїР°РєРµС‚РѕРІ
+	// РўР°Р№РјР°СѓС‚ РЅРµ РЅСѓР¶РµРЅ
 	while (isRunning()) {
 		err = handlePacketIn(
 			std::bind(&Client::any_packet_handler, this, std::placeholders::_1),
@@ -255,19 +255,19 @@ void Client::receiverThread()
 		);
 
 		if (err) {
-			if (err > 0) break;    // Критическая ошибка или соединение сброшено
-			else         continue; // Неудачный пакет, продолжить прием        
+			if (err > 0) break;    // РљСЂРёС‚РёС‡РµСЃРєР°СЏ РѕС€РёР±РєР° РёР»Рё СЃРѕРµРґРёРЅРµРЅРёРµ СЃР±СЂРѕС€РµРЅРѕ
+			else         continue; // РќРµСѓРґР°С‡РЅС‹Р№ РїР°РєРµС‚, РїСЂРѕРґРѕР»Р¶РёС‚СЊ РїСЂРёРµРј        
 		}
 	}
 
-	// Сбрасываем соединение (сокет для чтения)
+	// РЎР±СЂР°СЃС‹РІР°РµРј СЃРѕРµРґРёРЅРµРЅРёРµ (СЃРѕРєРµС‚ РґР»СЏ С‡С‚РµРЅРёСЏ)
 	setState(ClientState::Shutdown);
 
 	if (readSocket != INVALID_SOCKET)
 		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
 			wsa_print_err();
 
-	// Закрытие сокета (чтение)
+	// Р—Р°РєСЂС‹С‚РёРµ СЃРѕРєРµС‚Р° (С‡С‚РµРЅРёРµ)
 	setState(ClientState::CloseSocket);
 
 	if (readSocket != INVALID_SOCKET)
@@ -276,18 +276,18 @@ void Client::receiverThread()
 
 	readSocket = INVALID_SOCKET;
 
-	// Завершаем поток
+	// Р—Р°РІРµСЂС€Р°РµРј РїРѕС‚РѕРє
 	log_colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
 }
 
-// Поток отправки пакетов
+// РџРѕС‚РѕРє РѕС‚РїСЂР°РІРєРё РїР°РєРµС‚РѕРІ
 void Client::senderThread()
 {
-	// Задать имя потоку
+	// Р—Р°РґР°С‚СЊ РёРјСЏ РїРѕС‚РѕРєСѓ
 	setThreadDesc(L"[Sender]");
 
 	while (isRunning()) {
-		// Обработать основные пакеты
+		// РћР±СЂР°Р±РѕС‚Р°С‚СЊ РѕСЃРЅРѕРІРЅС‹Рµ РїР°РєРµС‚С‹
 		while (!mainPackets.empty()) {
 			PacketPtr packet = mainPackets.back();
 
@@ -299,7 +299,7 @@ void Client::senderThread()
 			mainPackets.pop();
 		}
 
-		// Обработать пакеты, не подтвержденные сервером
+		// РћР±СЂР°Р±РѕС‚Р°С‚СЊ РїР°РєРµС‚С‹, РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРЅС‹Рµ СЃРµСЂРІРµСЂРѕРј
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
@@ -312,14 +312,14 @@ void Client::senderThread()
 		Sleep(100);
 	}
 
-	// Сбрасываем соединение (сокет для записи)
+	// РЎР±СЂР°СЃС‹РІР°РµРј СЃРѕРµРґРёРЅРµРЅРёРµ (СЃРѕРєРµС‚ РґР»СЏ Р·Р°РїРёСЃРё)
 	setState(ClientState::Shutdown);
 
 	if (writeSocket != INVALID_SOCKET)
 		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
 			wsa_print_err();
 
-	// Закрытие сокета (запись)
+	// Р—Р°РєСЂС‹С‚РёРµ СЃРѕРєРµС‚Р° (Р·Р°РїРёСЃСЊ)
 	setState(ClientState::CloseSocket);
 
 	if (writeSocket != INVALID_SOCKET)
@@ -328,11 +328,11 @@ void Client::senderThread()
 
 	writeSocket = INVALID_SOCKET;
 
-	// Завершаем поток
+	// Р—Р°РІРµСЂС€Р°РµРј РїРѕС‚РѕРє
 	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
-// Создание потоков
+// РЎРѕР·РґР°РЅРёРµ РїРѕС‚РѕРєРѕРІ
 void Client::createThreads()
 {
 	receiver = std::thread(&Client::receiverThread, this);
@@ -340,7 +340,7 @@ void Client::createThreads()
 }
 
 
-// Принятие данных
+// РџСЂРёРЅСЏС‚РёРµ РґР°РЅРЅС‹С…
 int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 {
 	setState(ClientState::Receive);
@@ -348,23 +348,23 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 	std::array<char, NET_BUFFER_SIZE> respBuff;
 
 	while (isRunning()) {
-		// Цикл принятия сообщений.  Может завершиться:
-		// - после критической ошибки,
-		// - после закрытия соединения,
-		// - после таймаута (см. closeAfterTimeout)
+		// Р¦РёРєР» РїСЂРёРЅСЏС‚РёСЏ СЃРѕРѕР±С‰РµРЅРёР№.  РњРѕР¶РµС‚ Р·Р°РІРµСЂС€РёС‚СЊСЃСЏ:
+		// - РїРѕСЃР»Рµ РєСЂРёС‚РёС‡РµСЃРєРѕР№ РѕС€РёР±РєРё,
+		// - РїРѕСЃР»Рµ Р·Р°РєСЂС‹С‚РёСЏ СЃРѕРµРґРёРЅРµРЅРёСЏ,
+		// - РїРѕСЃР»Рµ С‚Р°Р№РјР°СѓС‚Р° (СЃРј. closeAfterTimeout)
 
 		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 		if      (respSize > 0) {
-			// Записываем данные от сервера
+			// Р—Р°РїРёСЃС‹РІР°РµРј РґР°РЅРЅС‹Рµ РѕС‚ СЃРµСЂРІРµСЂР°
 			dest = PacketFactory::create(respBuff.data(), respSize);
 
-			// Добавить пакет
+			// Р”РѕР±Р°РІРёС‚СЊ РїР°РєРµС‚
 			receivedPackets.push_back(dest);
 
 			break;
 		}
 		else if (!respSize) {
-			// Соединение сброшено
+			// РЎРѕРµРґРёРЅРµРЅРёРµ СЃР±СЂРѕС€РµРЅРѕ
 			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 			return 1;
 		}
@@ -372,23 +372,23 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			int err = WSAGetLastError();
 
 			if      (err == WSAETIMEDOUT) {
-				// Таймаут
+				// РўР°Р№РјР°СѓС‚
 				if (closeAfterTimeout) return -1;
 				else                   continue;
 			}
 			else if (err == WSAEMSGSIZE) {
-				// Размер пакета превысил размер буфера
-				// Вывести предупреждение
+				// Р Р°Р·РјРµСЂ РїР°РєРµС‚Р° РїСЂРµРІС‹СЃРёР» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
+				// Р’С‹РІРµСЃС‚Рё РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ
 				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
 			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
-				// Соединение сброшено
+				// РЎРѕРµРґРёРЅРµРЅРёРµ СЃР±СЂРѕС€РµРЅРѕ
 				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 				return 2;
 			}
 			else {
-				// Критическая ошибка
+				// РљСЂРёС‚РёС‡РµСЃРєР°СЏ РѕС€РёР±РєР°
 				wsa_print_err();
 				return 3;
 			}
@@ -398,7 +398,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 	return 0;
 }
 
-// Отправка данных
+// РћС‚РїСЂР°РІРєР° РґР°РЅРЅС‹С…
 int Client::sendData(PacketPtr packet)
 {
 	setState(ClientState::Send);
@@ -408,7 +408,7 @@ int Client::sendData(PacketPtr packet)
 		return 1;
 	}
 
-	// Добавить пакет
+	// Р”РѕР±Р°РІРёС‚СЊ РїР°РєРµС‚
 	sendedPackets.push_back(packet);
 
 	return 0;

@@ -4,7 +4,7 @@
 #include "Cleaner.h"
 #include "Server.h"
 
-// Запуск клинера
+// Р—Р°РїСѓСЃРє РєР»РёРЅРµСЂР°
 void Cleaner::startCleaner()
 {
 	if (started)
@@ -24,7 +24,7 @@ void Cleaner::startCleaner()
 	printCommandsList();
 }
 
-// Отключение клинера
+// РћС‚РєР»СЋС‡РµРЅРёРµ РєР»РёРЅРµСЂР°
 void Cleaner::closeCleaner()
 {
 	if (!started)
@@ -40,7 +40,7 @@ void Cleaner::closeCleaner()
 }
 
 
-// Напечатать команды клинера
+// РќР°РїРµС‡Р°С‚Р°С‚СЊ РєРѕРјР°РЅРґС‹ РєР»РёРЅРµСЂР°
 void Cleaner::printCommandsList() {
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the cleaner:");
 	if (!started)
@@ -52,7 +52,7 @@ void Cleaner::printCommandsList() {
 	}
 }
 
-// Напечатать режим работы клинера
+// РќР°РїРµС‡Р°С‚Р°С‚СЊ СЂРµР¶РёРј СЂР°Р±РѕС‚С‹ РєР»РёРЅРµСЂР°
 void Cleaner::printCleanerMode() {
 	const char* modeDesc = "-";
 
@@ -65,7 +65,7 @@ void Cleaner::printCleanerMode() {
 }
 
 
-// Очистка неактивных клиентов
+// РћС‡РёСЃС‚РєР° РЅРµР°РєС‚РёРІРЅС‹С… РєР»РёРµРЅС‚РѕРІ
 void Cleaner::cleanInactiveClients(bool ext)
 {
 	size_t cleaned = 0;
@@ -103,9 +103,9 @@ void Cleaner::cleanInactiveClients(bool ext)
 		log_raw_colored(ConsoleColor::InfoHighlighted, "All clients are active");
 }
 
-// Каждые 5 секунд очищать неактивных клиентов
+// РљР°Р¶РґС‹Рµ 5 СЃРµРєСѓРЅРґ РѕС‡РёС‰Р°С‚СЊ РЅРµР°РєС‚РёРІРЅС‹С… РєР»РёРµРЅС‚РѕРІ
 void Cleaner::inactiveClientsCleaner() {
-	// Задать имя потоку
+	// Р—Р°РґР°С‚СЊ РёРјСЏ РїРѕС‚РѕРєСѓ
 	setThreadDesc(L"[Server][Cleaner]");
 
 	while (Server::getInstance().isRunning() && started) {

@@ -33,21 +33,21 @@ int start() {
 
 		log_colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
 
-		while (Client::getInstance().isRunning()) { // Прием команд из командной строки
+		while (Client::getInstance().isRunning()) { // РџСЂРёРµРј РєРѕРјР°РЅРґ РёР· РєРѕРјР°РЅРґРЅРѕР№ СЃС‚СЂРѕРєРё
 			std::cin >> cmd;
 			std::cin.ignore();
 
-			if (cmd == "send") { // Отправка данных серверу
+			if (cmd == "send") { // РћС‚РїСЂР°РІРєР° РґР°РЅРЅС‹С… СЃРµСЂРІРµСЂСѓ
 				log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 				std::getline(std::cin, cmd);
 
 				Client::getInstance().sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
 			}
-			else if (cmd == "commands") { // Вывод всех доступных команд
+			else if (cmd == "commands") { // Р’С‹РІРѕРґ РІСЃРµС… РґРѕСЃС‚СѓРїРЅС‹С… РєРѕРјР°РЅРґ
 				Client::getInstance().printCommandsList();
 			}
-			else if (cmd == "close") { // Закрытие клиента
+			else if (cmd == "close") { // Р—Р°РєСЂС‹С‚РёРµ РєР»РёРµРЅС‚Р°
 				Client::getInstance().disconnect();
 				return 0;
 			}
@@ -68,7 +68,7 @@ int start() {
 
 int main()
 {
-	// Задать имя потоку
+	// Р—Р°РґР°С‚СЊ РёРјСЏ РїРѕС‚РѕРєСѓ
 	setThreadDesc(L"[main]");
 
 	if (int err = start())
@@ -77,7 +77,7 @@ int main()
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of client");
 
 	int v;
-	std::cin >> v; // Чтобы не закрывалось окно
+	std::cin >> v; // Р§С‚РѕР±С‹ РЅРµ Р·Р°РєСЂС‹РІР°Р»РѕСЃСЊ РѕРєРЅРѕ
 
 	return 0;
 }
