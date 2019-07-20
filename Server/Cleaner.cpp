@@ -71,18 +71,18 @@ void Cleaner::printMode() {
 }
 
 void Cleaner::changeMode() {
-	CleanerMode cmd;
+	uint8_t cmd;
 	
 	log_raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
-	log_colored(ConsoleColor::Info,            "  %d - Only disconnect", CleanerMode::OnlyDisconnect);
-	log_colored(ConsoleColor::Info,            "  %d - Agressive mode",  CleanerMode::AgressiveMode);
+	log_colored(ConsoleColor::Info,                "  %d - Only disconnect", CleanerMode::OnlyDisconnect);
+	log_colored(ConsoleColor::Info,                "  %d - Agressive mode",  CleanerMode::AgressiveMode);
 
 	std::cin >> cmd;
 
 	switch(cmd) {
-		case CleanerMode::OnlyDisconnect:
-		case CleanerMode::AgressiveMode:
-			mode = cmd;
+		case (uint8_t)(CleanerMode::OnlyDisconnect):
+		case (uint8_t)(CleanerMode::AgressiveMode):
+			mode = (CleanerMode)cmd;
 			log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
 			break;
 		default:
