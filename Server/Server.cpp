@@ -87,39 +87,6 @@ void Server::closeServer()
 }
 
 
-void Server::printCommandsList() const
-{
-	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
-	log_raw_colored(ConsoleColor::Info,            "  \"list\"          => Print list of all active clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"list_detailed\" => Print list of all active clients with extra info");
-	log_raw_colored(ConsoleColor::Info,            "  \"send\"          => Send the packet to client");
-	log_raw_colored(ConsoleColor::Info,            "  \"send_all\"      => Send the packet to all clients");
-	log_raw_colored(ConsoleColor::Info,            "  \"save\"          => Save all data into the file");
-	log_raw_colored(ConsoleColor::Info,            "  \"clean\"         => Clean all inactive users");
-	log_raw_colored(ConsoleColor::Info,            "  \"commands\"      => Print all available commands");
-	log_raw_colored(ConsoleColor::Danger,          "  \"close\"         => Close the server");
-}
-
-
-// Обход списка клиентов и их обработка функцией handler
-int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
-{
-	int err = 0;
-	clients_mutex.lock();
-
-	for (auto pair : clientPool) {
-		ConnectedClient& client = *(pair.second);
-
-		if (onlyActive && !client.isRunning()) continue;
-
-		err = handler(client);
-		if (err) break; // В случае ошибки прервать выполнение
-	}
-
-	clients_mutex.unlock();
-	return err;
-}
-
 // Получение числа активных клиентов
 size_t Server::getActiveClientsCount()
 {
@@ -212,6 +179,127 @@ ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, uin
 }
 
 
+// Вывести список команд
+void Server::printCommandsList() const
+{
+	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
+	log_raw_colored(ConsoleColor::Info, "  \"list\"          => Print list of all active clients");
+	log_raw_colored(ConsoleColor::Info, "  \"list_detailed\" => Print list of all active clients with extra info");
+	log_raw_colored(ConsoleColor::Info, "  \"send\"          => Send the packet to client");
+	log_raw_colored(ConsoleColor::Info, "  \"send_all\"      => Send the packet to all clients");
+	log_raw_colored(ConsoleColor::Info, "  \"save\"          => Save all data into the file");
+	log_raw_colored(ConsoleColor::Info, "  \"clean\"         => Clean all inactive users");
+	log_raw_colored(ConsoleColor::Info, "  \"commands\"      => Print all available commands");
+	log_raw_colored(ConsoleColor::Danger, "  \"close\"         => Close the server");
+}
+
+// Вывести список всех клиентов
+void Server::printClientsList(bool ext)
+{
+	processClientsByPair(
+		false,
+		[ext](ConnectedClient& client) -> int { client.printInfo(ext); return 0; }
+	);
+}
+
+// Послать пакет клиенту
+void Server::send(ConnectedClientPtr client, PacketPtr packet)
+{
+	clients_mutex.lock();
+
+	if (!client) {
+		log_raw_colored(ConsoleColor::Info, "Please type the client ID/IP/login");
+
+		std::string cmd;
+		std::getline(std::cin, cmd);
+
+		ConnectedClientPtr client = getClientByID(false, true, std::stoi(cmd));
+		if (!client) {
+			IN_ADDR IP_struct;
+			inet_pton(AF_INET, cmd.data(), &IP_struct);
+
+			client = getClientByIP(false, true, IP_struct.s_addr);
+			if (!client) {
+				std::hash<std::string> hashObj;
+				uint32_t loginHash = hashObj(cmd);
+
+				client = getClientByLogin(false, true, loginHash);
+				if (!client) {
+					log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
+					return;
+				}
+			}
+		}
+	}
+
+	if (!packet) {
+		log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+
+		std::string cmd;
+		std::getline(std::cin, cmd);
+
+		packet = PacketFactory::create(cmd.data(), cmd.size());
+	}
+
+	client->sendPacket(packet);
+
+	clients_mutex.unlock();
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+}
+
+// Послать пакет всем клиентам
+void Server::sendAll(PacketPtr packet)
+{
+	if (!packet) {
+		log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+
+		std::string cmd;
+		std::getline(std::cin, cmd);
+
+		PacketPtr packet = PacketFactory::create(cmd.data(), cmd.size(), false);
+	}
+
+	processClientsByPair(
+		true,
+		[packet](ConnectedClient& client) -> int
+		{ client.sendPacket(packet); return 0; }
+	);
+
+	log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+}
+
+// Сохранение данных клиентов
+void Server::save()
+{
+	processClientsByPair(
+		false,
+		[](ConnectedClient& client) -> int { client.saveData(); return 0; }
+	);
+
+	log_colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
+}
+
+// Обход списка клиентов и их обработка функцией handler
+int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
+{
+	int err = 0;
+	clients_mutex.lock();
+
+	for (auto pair : clientPool) {
+		ConnectedClient& client = *(pair.second);
+
+		if (onlyActive && !client.isRunning()) continue;
+
+		err = handler(client);
+		if (err) break; // В случае ошибки прервать выполнение
+	}
+
+	clients_mutex.unlock();
+	return err;
+}
+
+// Инициализация сокета по порту
 SOCKET Server::initSocket(uint16_t port)
 {
 	SOCKET result = INVALID_SOCKET;
@@ -269,6 +357,7 @@ SOCKET Server::initSocket(uint16_t port)
 	return result;
 }
 
+// Инициализация сокетов сервера
 int Server::initSockets()
 {
 	// Create a read socket that receiving data from server

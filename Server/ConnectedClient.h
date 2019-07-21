@@ -47,14 +47,17 @@ public:
 	int    getPort(bool isReadPort)     const { return isReadPort   ? readPort   : writePort; }
 	SOCKET getSocket(bool isReadSocket) const { return isReadSocket ? readSocket : writeSocket; }
 
-	void getInfo(bool ext = false);
-
 	// Setters
 	void setPort(bool isReadPort, int port)          { if (isReadPort)   readPort   = port;   else writePort   = port; }
 	void setSocket(bool isReadSocket, SOCKET socket) { if (isReadSocket) readSocket = socket; else writeSocket = socket; }
 
-	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
+	void sendPacket(PacketPtr packet) { if (packet) mainPackets.push(packet); }
 	bool disconnect();
+
+	// Other
+	void printInfo(bool ext = false);
+
+	void saveData();
 
 	// Instances
 	std::vector<PacketPtr> receivedPackets;

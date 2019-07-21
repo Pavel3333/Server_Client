@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <array>
 #include <functional>
+#include <fstream>
 #include "ConnectedClient.h"
 
 
@@ -124,13 +125,17 @@ void ConnectedClient::resetSocketsAndPorts()
 }
 
 
-void ConnectedClient::getInfo(bool ext)
+// Вывести информацию о клиенте
+void ConnectedClient::printInfo(bool ext)
 {
 	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
 
-	log_colored(ConsoleColor::InfoHighlighted, "  login: %.*s", login.size(), login.data());
-	log_colored(ConsoleColor::InfoHighlighted, "  IP   : %s", IP_str);
-	log_colored(ConsoleColor::InfoHighlighted, "  host : %s", host);
+	const char* status = isRunning() ? "connected" : "disconnected";
+
+	log_colored(ConsoleColor::InfoHighlighted, "  status: %s", status);
+	log_colored(ConsoleColor::InfoHighlighted, "  login : %.*s", login.size(), login.data());
+	log_colored(ConsoleColor::InfoHighlighted, "  IP    : %s", IP_str);
+	log_colored(ConsoleColor::InfoHighlighted, "  host  : %s", host);
 
 	if (ext) {
 		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
@@ -171,6 +176,14 @@ bool ConnectedClient::disconnect()
 	disconnected = true;
 
 	return true;
+}
+
+// Сохранение данных клиента
+void ConnectedClient::saveData() {
+	std::ofstream fil("all_server_data.txt", std::ios::app);
+	fil.setf(std::ios::boolalpha); // Вывод true/false
+	fil << *this;
+	fil.close();
 }
 
 

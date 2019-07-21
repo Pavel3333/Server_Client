@@ -2,6 +2,7 @@
 #include <map>
 #include <mutex>
 #include <thread>
+#include <string>
 #include "Common.h"
 #include "ConnectedClient.h"
 
@@ -39,10 +40,16 @@ public:
 
 	ConnectedClientPtr getClientByID(bool lockMutex, bool onlyActive, uint32_t ID);
 	ConnectedClientPtr getClientByIP(bool lockMutex, bool onlyActive, uint32_t IP, int port = -1, bool isReadPort = false);
-	ConnectedClientPtr getClientByLogin(bool lockMutex, bool onlyActive, uint32_t loginHash, int16_t clientID);
+	ConnectedClientPtr getClientByLogin(bool lockMutex, bool onlyActive, uint32_t loginHash, int16_t clientID = -1);
 
 	// Other methods
 	void printCommandsList() const;
+	void printClientsList(bool ext = false);
+
+	void send(ConnectedClientPtr client = nullptr, PacketPtr packet = nullptr);
+	void sendAll(PacketPtr packet = nullptr);
+
+	void save();
 
 	int processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler);
 
