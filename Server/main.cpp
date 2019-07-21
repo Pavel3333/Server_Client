@@ -2,18 +2,8 @@
 #include "Server.h"
 #include "Cleaner.h"
 
-#include <string>
-#include <fstream>
-
 constexpr uint16_t READ_PORT  = 27011;
 constexpr uint16_t WRITE_PORT = 27010;
-
-void saveData(ConnectedClient& client) {
-	std::ofstream fil("all_server_data.txt", std::ios::app);
-	fil.setf(std::ios::boolalpha); // Вывод true/false
-	fil << client;
-	fil.close();
-}
 
 int start()
 {
@@ -30,67 +20,19 @@ int start()
 		std::cin.ignore();
 
 		if      (cmd == "list") { // Получаем данные всех активных клиентов
-			Server::getInstance().processClientsByPair(
-				true,
-				[](ConnectedClient& client) -> int { client.getInfo(); return 0; }
-			);
+			Server::getInstance().printClientsList(false);
 		}
 		else if (cmd == "list_detailed") { // Получаем расширенные данные всех активных клиентов
-			Server::getInstance().processClientsByPair(
-				true,
-				[](ConnectedClient& client) -> int { client.getInfo(true); return 0; }
-			);
+			Server::getInstance().printClientsList(true);
 		}
 		else if (cmd == "send") { // Послать пакет определенному клиенту
-			log_raw_colored(ConsoleColor::Info, "Please type the client ID or IP");
-
-			std::cin >> cmd;
-			std::cin.ignore();
-
-			Server::getInstance().clients_mutex.lock();
-
-			ConnectedClientPtr found_client = Server::getInstance().getClientByID(false, true, std::stoi(cmd));
-			if (!found_client) {
-				IN_ADDR IP_struct;
-				inet_pton(AF_INET, cmd.data(), &IP_struct);
-
-				found_client = Server::getInstance().getClientByIP(false, true, IP_struct.s_addr);
-				if (!found_client) {
-					log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
-					continue;
-				}
-			}
-
-			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
-
-			std::getline(std::cin, cmd);
-
-			found_client->sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
-
-			Server::getInstance().clients_mutex.unlock();
-
-			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+			Server::getInstance().send();
 		}
 		else if (cmd == "send_all") { // Посылаем пакеты активным клиентам
-			log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
-
-			std::getline(std::cin, cmd);
-
-			Server::getInstance().processClientsByPair(
-				true,
-				[cmd](ConnectedClient& client) -> int 
-				{ client.sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false)); return 0; }
-			);
-
-			log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+			Server::getInstance().sendAll();
 		}
 		else if (cmd == "save") { // Сохранение данных всех клиентов
-			Server::getInstance().processClientsByPair(
-				false,
-				[](ConnectedClient& client) -> int { saveData(client); return 0; }
-			);
-
-			log_colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
+			Server::getInstance().save();
 		}
 		else if (cmd == "clean") { // Очистка неактивных клиентов
 			Cleaner::getInstance().cleanInactiveClients(true);
@@ -106,25 +48,10 @@ int start()
 			Cleaner::getInstance().startCleaner();
 		}
 		else if (cmd == "get_cleaner_mode") { // Вывести режим работы клинера
-			Cleaner::getInstance().printCleanerMode();
+			Cleaner::getInstance().printMode();
 		}
 		else if (cmd == "change_cleaner_mode") { // Сменить режим работы клинера
-			log_raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
-			log_raw_colored(ConsoleColor::Info,            "  1 - Only disconnect");
-			log_raw_colored(ConsoleColor::Info,            "  2 - Agressive mode");
-
-			std::cin >> cmd;
-
-			if      (cmd == "1")
-				Cleaner::getInstance().changeCleanerMode(CleanerMode::OnlyDisconnect);
-			else if (cmd == "2")
-				Cleaner::getInstance().changeCleanerMode(CleanerMode::AgressiveMode);
-			else {
-				log_raw_colored(ConsoleColor::WarningHighlighted, "Invalid mode was typed");
-				continue;
-			}
-
-			log_raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
+			Cleaner::getInstance().changeMode();
 		}
 		else if (cmd == "disable_cleaner") { // Выключение клинера
 			Cleaner::getInstance().closeCleaner();
