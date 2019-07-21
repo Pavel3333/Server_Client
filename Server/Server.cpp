@@ -213,7 +213,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 		std::string cmd;
 		std::getline(std::cin, cmd);
 
-		ConnectedClientPtr client = getClientByID(false, true, std::stoi(cmd));
+		client = getClientByID(false, true, std::stoi(cmd));
 		if (!client) {
 			IN_ADDR IP_struct;
 			inet_pton(AF_INET, cmd.data(), &IP_struct);
@@ -238,7 +238,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 		std::string cmd;
 		std::getline(std::cin, cmd);
 
-		packet = PacketFactory::create(cmd.data(), cmd.size());
+		packet = PacketFactory::create(cmd.data(), cmd.size(), false);
 	}
 
 	client->sendPacket(packet);
@@ -257,7 +257,7 @@ void Server::sendAll(PacketPtr packet)
 		std::string cmd;
 		std::getline(std::cin, cmd);
 
-		PacketPtr packet = PacketFactory::create(cmd.data(), cmd.size(), false);
+		packet = PacketFactory::create(cmd.data(), cmd.size(), false);
 	}
 
 	processClientsByPair(

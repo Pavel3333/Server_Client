@@ -5,7 +5,7 @@
 
 constexpr uint16_t    READ_PORT  = 27010;
 constexpr uint16_t    WRITE_PORT = 27011;
-constexpr const char* SERVER_IP  = "95.72.11.66";
+constexpr const char* SERVER_IP  = "192.168.0.12";
 
 int start() {
 	std::string cmd;
@@ -26,12 +26,14 @@ int start() {
 	uint8_t ctr_reconnect = 1;
 
 	while (ctr_reconnect <= 5) {
-		if (Client::getInstance().init(cmd, SERVER_IP, READ_PORT, WRITE_PORT))
-			return 1;
+		log_colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
+
+		if (Client::getInstance().init(cmd, SERVER_IP, READ_PORT, WRITE_PORT)) {
+			ctr_reconnect++;
+			continue;
+		}
 
 		Client::getInstance().printCommandsList();
-
-		log_colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
 
 		while (Client::getInstance().isRunning()) { // Прием команд из командной строки
 			std::cin >> cmd;

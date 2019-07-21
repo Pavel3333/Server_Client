@@ -109,7 +109,13 @@ SOCKET Client::connect2server(uint16_t port)
 
 	// Connect to server
 	if (connect(result, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) {
-		wsa_print_err();
+		int err = WSAGetLastError();
+		if (err == WSAETIMEDOUT)
+			// Таймаут
+			log_raw_colored(ConsoleColor::WarningHighlighted, "Unable to connect to the server: timeout");
+		else
+			// Критическая ошибка
+			wsa_print_err();
 		return INVALID_SOCKET;
 	}
 
@@ -122,10 +128,8 @@ int Client::handshake()
 	setState(ClientState::CreateReadSocket);
 
 	readSocket = connect2server(readPort);
-	if (readSocket == INVALID_SOCKET) {
-		wsa_print_err();
+	if (readSocket == INVALID_SOCKET)
 		return 1;
-	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
@@ -135,10 +139,8 @@ int Client::handshake()
 	setState(ClientState::CreateWriteSocket);
 
 	writeSocket = connect2server(writePort);
-	if (writeSocket == INVALID_SOCKET) {
-		wsa_print_err();
+	if (writeSocket == INVALID_SOCKET)
 		return 1;
-	}
 
 	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
