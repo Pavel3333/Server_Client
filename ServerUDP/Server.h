@@ -11,9 +11,6 @@ enum class ServerState {
 	CreateReadSocket,
 	CreateWriteSocket,
 	Bind,
-	SetOpts,
-	Listen,
-	Waiting,
 	Connect,
 	CloseSockets
 };

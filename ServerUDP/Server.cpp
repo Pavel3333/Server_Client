@@ -304,7 +304,7 @@ SOCKET Server::initSocket(uint16_t port)
 {
 	SOCKET result = INVALID_SOCKET;
 
-	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (result == INVALID_SOCKET) {
 		wsa_print_err();
 		return INVALID_SOCKET;
@@ -320,35 +320,6 @@ SOCKET Server::initSocket(uint16_t port)
 	hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
 	int err = bind(result, (sockaddr*)&hint, sizeof(hint));
-	if (err == SOCKET_ERROR) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
-
-	// Set socket options
-	setState(ServerState::SetOpts);
-	
-	uint32_t value = TIMEOUT * 1000;
-	uint32_t size = sizeof(value);
-
-	// Set timeout for sending
-	err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
-	if (err == SOCKET_ERROR) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
-
-	// Set timeout for receiving
-	err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
-	if (err == SOCKET_ERROR) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
-
-	// Listening the port
-	setState(ServerState::Listen);
-
-	err = listen(result, SOMAXCONN);
 	if (err == SOCKET_ERROR) {
 		wsa_print_err();
 		return INVALID_SOCKET;
@@ -416,31 +387,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 
 		log_colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
 
-		// Ожидание новых подключений
-		setState(ServerState::Waiting);
-
-		int select_res = 0;
-		while (isRunning()) {
-			fd_set s_set;
-			FD_ZERO(&s_set);
-			FD_SET(socket, &s_set);
-			timeval timeout = { TIMEOUT, 0 }; // Таймаут
-
-			select_res = select(select_res + 1, &s_set, 0, 0, &timeout);
-			if (select_res) break;
-
-			Sleep(1000);
-		}
-
-		if (!isRunning())
-			break;
-
-		if (select_res == SOCKET_ERROR)
-			wsa_print_err();
-
-		if (select_res <= 0)
-			continue;
-
+		/*
 		// Connection to client
 		setState(ServerState::Connect);
 
@@ -547,6 +494,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 		}
 
 		clients_mutex.unlock();
+		*/
 	}
 
 	// Закрываем поток
@@ -568,9 +516,6 @@ void Server::setState(ServerState state)
 		PRINT_STATE(CreateReadSocket)
 		PRINT_STATE(CreateWriteSocket)
 		PRINT_STATE(Bind)
-		PRINT_STATE(SetOpts)
-		PRINT_STATE(Listen)
-		PRINT_STATE(Waiting)
 		PRINT_STATE(Connect)
 		PRINT_STATE(CloseSockets)
 	default:
