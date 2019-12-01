@@ -91,6 +91,10 @@ struct ServerHelloPacket {
 	uint32_t clientID;
 };
 
+struct ClientConnectPacket {
+	uint32_t ver;
+};
+
 struct ClientHelloPacket {
 	ClientHelloPacket() {
 		serverHelloPacketID = ~0;

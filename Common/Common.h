@@ -4,6 +4,9 @@
 #include <thread>
 #include <mutex>
 
+// Client actual version
+const uint32_t CLIENT_VER = 1;
+
 // Login string max size
 const uint8_t  LOGIN_MAX_SIZE = 24;
 
