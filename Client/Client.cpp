@@ -58,15 +58,15 @@ void Client::disconnect()
 
 	WSACleanup();
 
-	log_raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
 }
 
 void Client::printCommandsList() const
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
-	log_raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
-	log_raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
-	log_raw_colored(ConsoleColor::Danger, "  \"close\"    => Close the client");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
+	LOG::raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
+	LOG::raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
+	LOG::raw_colored(ConsoleColor::Danger, "  \"close\"    => Close the client");
 }
 
 
@@ -112,7 +112,7 @@ SOCKET Client::connect2server(uint16_t port)
 		int err = WSAGetLastError();
 		if (err == WSAETIMEDOUT)
 			// Таймаут
-			log_raw_colored(ConsoleColor::WarningHighlighted, "Unable to connect to the server: timeout");
+			LOG::raw_colored(ConsoleColor::WarningHighlighted, "Unable to connect to the server: timeout");
 		else
 			// Критическая ошибка
 			wsa_print_err();
@@ -131,7 +131,7 @@ int Client::handshake()
 	if (readSocket == INVALID_SOCKET)
 		return 1;
 
-	log_colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
 
 	Sleep(500); // Задержка нужна для того, чтобы сервер успел принять соединение
 
@@ -142,7 +142,7 @@ int Client::handshake()
 	if (writeSocket == INVALID_SOCKET)
 		return 1;
 
-	log_colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
 
 	// Receive a Hello packet from the server
 	setState(ClientState::HelloReceiving);
@@ -182,7 +182,7 @@ int Client::handshake()
 
 	started = true;
 
-	log_colored(ConsoleColor::SuccessHighlighted, "Client handshaked successfully! Client ID: %d", ID);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "Client handshaked successfully! Client ID: %d", ID);
 
 	createThreads();
 
@@ -193,14 +193,14 @@ int Client::handshake()
 // Обработать пакет ACK
 int Client::ack_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int Client::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
@@ -279,7 +279,7 @@ void Client::receiverThread()
 	readSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
+	LOG::colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -294,7 +294,7 @@ void Client::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
+				LOG::colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -305,7 +305,7 @@ void Client::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
+				LOG::colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -331,7 +331,7 @@ void Client::senderThread()
 	writeSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
+	LOG::colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
 // Создание потоков
@@ -367,7 +367,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		}
 		else if (!respSize) {
 			// Соединение сброшено
-			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 			return 1;
 		}
 		else {
@@ -381,12 +381,12 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			else if (err == WSAEMSGSIZE) {
 				// Размер пакета превысил размер буфера
 				// Вывести предупреждение
-				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				LOG::raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
 			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
 				// Соединение сброшено
-				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 				return 2;
 			}
 			else {
@@ -438,12 +438,12 @@ void Client::setState(ClientState state)
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSocket);
 	default:
-		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
+		LOG::colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
+	LOG::colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

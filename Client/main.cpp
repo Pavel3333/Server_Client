@@ -12,13 +12,13 @@ int start() {
 	bool err = true;
 
 	while (err) {
-		log_raw("Please type the login:");
+		LOG::raw("Please type the login:");
 
 		std::cin >> cmd;
 		std::cin.ignore();
 
 		if (cmd.size() > LOGIN_MAX_SIZE)
-			log_colored(ConsoleColor::DangerHighlighted, "Login size must be less than %d!", LOGIN_MAX_SIZE);
+			LOG::colored(ConsoleColor::DangerHighlighted, "Login size must be less than %d!", LOGIN_MAX_SIZE);
 		else
 			err = false;
 	}
@@ -26,7 +26,7 @@ int start() {
 	uint8_t ctr_reconnect = 1;
 
 	while (ctr_reconnect <= 5) {
-		log_colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
+		LOG::colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
 
 		if (Client::getInstance().init(cmd, SERVER_IP, READ_PORT, WRITE_PORT)) {
 			ctr_reconnect++;
@@ -40,7 +40,7 @@ int start() {
 			std::cin.ignore();
 
 			if (cmd == "send") { // Отправка данных серверу
-				log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+				LOG::raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 				std::getline(std::cin, cmd);
 
@@ -63,7 +63,7 @@ int start() {
 	}
 
 	if (ctr_reconnect > 5)
-		log_raw_colored(ConsoleColor::DangerHighlighted, "Too many connection attempts. Contact the developers");
+		LOG::raw_colored(ConsoleColor::DangerHighlighted, "Too many connection attempts. Contact the developers");
 
 	return 0;
 }
@@ -74,9 +74,9 @@ int main()
 	setThreadDesc(L"[main]");
 
 	if (int err = start())
-		log_colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);
+		LOG::colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);
 
-	log_raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of client");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of client");
 
 	int v;
 	std::cin >> v; // Чтобы не закрывалось окно

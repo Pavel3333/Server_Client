@@ -30,7 +30,7 @@ int Server::startServer(uint16_t readPort, uint16_t writePort)
 	if (err = initSockets())
 		return err;
 
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "The server is running");
+	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "The server is running");
 
 	started = true;
 
@@ -83,7 +83,7 @@ void Server::closeServer()
 
 	WSACleanup();
 
-	log_raw_colored(ConsoleColor::InfoHighlighted, "The server was stopped");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "The server was stopped");
 }
 
 
@@ -182,15 +182,15 @@ ConnectedClientPtr Server::getClientByLogin(bool lockMutex, bool onlyActive, uin
 // Вывести список команд
 void Server::printCommandsList() const
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
-	log_raw_colored(ConsoleColor::Info, "  \"list\"          => Print list of all active clients");
-	log_raw_colored(ConsoleColor::Info, "  \"list_detailed\" => Print list of all active clients with extra info");
-	log_raw_colored(ConsoleColor::Info, "  \"send\"          => Send the packet to client");
-	log_raw_colored(ConsoleColor::Info, "  \"send_all\"      => Send the packet to all clients");
-	log_raw_colored(ConsoleColor::Info, "  \"save\"          => Save all data into the file");
-	log_raw_colored(ConsoleColor::Info, "  \"clean\"         => Clean all inactive users");
-	log_raw_colored(ConsoleColor::Info, "  \"commands\"      => Print all available commands");
-	log_raw_colored(ConsoleColor::Danger, "  \"close\"         => Close the server");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the server:");
+	LOG::raw_colored(ConsoleColor::Info, "  \"list\"          => Print list of all active clients");
+	LOG::raw_colored(ConsoleColor::Info, "  \"list_detailed\" => Print list of all active clients with extra info");
+	LOG::raw_colored(ConsoleColor::Info, "  \"send\"          => Send the packet to client");
+	LOG::raw_colored(ConsoleColor::Info, "  \"send_all\"      => Send the packet to all clients");
+	LOG::raw_colored(ConsoleColor::Info, "  \"save\"          => Save all data into the file");
+	LOG::raw_colored(ConsoleColor::Info, "  \"clean\"         => Clean all inactive users");
+	LOG::raw_colored(ConsoleColor::Info, "  \"commands\"      => Print all available commands");
+	LOG::raw_colored(ConsoleColor::Danger, "  \"close\"         => Close the server");
 }
 
 // Вывести список всех клиентов
@@ -208,7 +208,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 	clients_mutex.lock();
 
 	if (!client) {
-		log_raw_colored(ConsoleColor::Info, "Please type the client ID/IP/login");
+		LOG::raw_colored(ConsoleColor::Info, "Please type the client ID/IP/login");
 
 		std::string cmd;
 		std::getline(std::cin, cmd);
@@ -225,7 +225,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 
 				client = getClientByLogin(false, true, loginHash);
 				if (!client) {
-					log_raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
+					LOG::raw_colored(ConsoleColor::WarningHighlighted, "Client not found!"); // Клиент не найден
 					return;
 				}
 			}
@@ -233,7 +233,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 	}
 
 	if (!packet) {
-		log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+		LOG::raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 		std::string cmd;
 		std::getline(std::cin, cmd);
@@ -245,14 +245,14 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 
 	clients_mutex.unlock();
 
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
 }
 
 // Послать пакет всем клиентам
 void Server::sendAll(PacketPtr packet)
 {
 	if (!packet) {
-		log_raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+		LOG::raw_colored(ConsoleColor::Info, "Please type the data you want to send");
 
 		std::string cmd;
 		std::getline(std::cin, cmd);
@@ -266,7 +266,7 @@ void Server::sendAll(PacketPtr packet)
 		{ client.sendPacket(packet); return 0; }
 	);
 
-	log_raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
 }
 
 // Сохранение данных клиентов
@@ -277,7 +277,7 @@ void Server::save()
 		[](ConnectedClient& client) -> int { client.saveData(); return 0; }
 	);
 
-	log_colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
+	LOG::colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
 }
 
 // Обход списка клиентов и их обработка функцией handler
@@ -340,7 +340,7 @@ int Server::initSockets()
 		return 1;
 	}
 
-	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", readPort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", readPort);
 
 	// Create a write socket that sending data to the server
 	setState(ServerState::CreateWriteSocket);
@@ -351,7 +351,7 @@ int Server::initSockets()
 		return 1;
 	}
 
-	log_colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", writePort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "The server can accept clients on the port %d", writePort);
 
 	started = true;
 
@@ -380,12 +380,12 @@ void Server::processIncomeConnection(bool isReadSocket)
 	// 10 clients limit
 	while (isRunning()) {
 		if(getActiveClientsCount() > 10) {
-			log_raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
+			LOG::raw_colored(ConsoleColor::WarningHighlighted, "Client connections count limit exceeded");
 			Sleep(10000);
 			continue;
 		}
 
-		log_colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
+		LOG::colored(ConsoleColor::InfoHighlighted, "Wait for client on port %d...", port);
 
 		/*
 		// Connection to client
@@ -440,7 +440,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 				int err = found_client_same_IP->second_handshake(clientSocket, client_port);
 				if (err) {
 					// В случае ошибки выводим код ошибки и сбрасываем соединение
-					log_colored(ConsoleColor::DangerHighlighted, "Client %d: second handshake failed: error %d", err);
+					LOG::colored(ConsoleColor::DangerHighlighted, "Client %d: second handshake failed: error %d", err);
 					shutdown(clientSocket, SD_BOTH);
 					closesocket(clientSocket);
 				}
@@ -455,7 +455,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 						found_client_same_IP->createThreads();
 					else if(!found_client_same_login->isRunning()) {
 						// Есть клиент с таким же логином, но с разорванным соединением и другим ID
-						log_colored(ConsoleColor::InfoHighlighted, "Client %d: found stopped client %d with same login %.*s", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
+						LOG::colored(ConsoleColor::InfoHighlighted, "Client %d: found stopped client %d with same login %.*s", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
 						// Перенести порты
 						found_client_same_login->setPort(false, found_client_same_IP->getPort(false));
 						found_client_same_login->setPort(true,  found_client_same_IP->getPort(true));
@@ -474,7 +474,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 					else {
 						// Уже подключен клиент с таким логином
 						// Сбрасываем соединение
-						log_colored(ConsoleColor::WarningHighlighted, "Client %d: Already exists running client %d with same login %.*s, closing connection...", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
+						LOG::colored(ConsoleColor::WarningHighlighted, "Client %d: Already exists running client %d with same login %.*s, closing connection...", found_client_same_IP->getID(), found_client_same_login->getID(), login.size(), login.data());
 
 						shutdown(clientSocket, SD_BOTH);
 						closesocket(clientSocket);
@@ -498,7 +498,7 @@ void Server::processIncomeConnection(bool isReadSocket)
 	}
 
 	// Закрываем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Closing PIC (Processing Incoming Connections) thread");
+	LOG::colored(ConsoleColor::InfoHighlighted, "Closing PIC (Processing Incoming Connections) thread");
 }
 
 
@@ -519,12 +519,12 @@ void Server::setState(ServerState state)
 		PRINT_STATE(Connect)
 		PRINT_STATE(CloseSockets)
 	default:
-		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
+		LOG::colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
+	LOG::colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

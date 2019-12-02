@@ -20,7 +20,7 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	log_colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected!", ID, IP_str, host);
+	LOG::colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected!", ID, IP_str, host);
 }
 
 ConnectedClient::~ConnectedClient() {
@@ -37,8 +37,8 @@ void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
 	readPort    = port;
 	writeSocket = socket;
 
-	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: first handshake was successful!", ID);
-	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Read port: %d", ID, readPort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "Client %d: first handshake was successful!", ID);
+	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Read port: %d", ID, readPort);
 }
 
 // Второе рукопожатие с соединенным клиентом
@@ -98,9 +98,9 @@ int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
 	std::hash<std::string> hashObj;
 	loginHash = hashObj(login);
 
-	log_colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
-	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
-	log_colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
+	LOG::colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
+	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
+	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
 
 	return 0;
 }
@@ -128,23 +128,23 @@ void ConnectedClient::resetSocketsAndPorts()
 // Вывести информацию о клиенте
 void ConnectedClient::printInfo(bool ext)
 {
-	log_colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
+	LOG::colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
 
 	const char* status = isRunning() ? "connected" : "disconnected";
 
-	log_colored(ConsoleColor::InfoHighlighted, "  status: %s", status);
-	log_colored(ConsoleColor::InfoHighlighted, "  login : %.*s", login.size(), login.data());
-	log_colored(ConsoleColor::InfoHighlighted, "  IP    : %s", IP_str);
-	log_colored(ConsoleColor::InfoHighlighted, "  host  : %s", host);
+	LOG::colored(ConsoleColor::InfoHighlighted, "  status: %s", status);
+	LOG::colored(ConsoleColor::InfoHighlighted, "  login : %.*s", login.size(), login.data());
+	LOG::colored(ConsoleColor::InfoHighlighted, "  IP    : %s", IP_str);
+	LOG::colored(ConsoleColor::InfoHighlighted, "  host  : %s", host);
 
 	if (ext) {
-		log_colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  sended:        %d", sendedPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  in main queue: %d", mainPackets.size());
-		log_colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d", syncPackets.size());
+		LOG::colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
+		LOG::colored(ConsoleColor::InfoHighlighted, "  sended:        %d", sendedPackets.size());
+		LOG::colored(ConsoleColor::InfoHighlighted, "  in main queue: %d", mainPackets.size());
+		LOG::colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d", syncPackets.size());
 	}
 
-	log_raw_colored(ConsoleColor::InfoHighlighted, "}");
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, "}");
 }
 
 bool ConnectedClient::disconnect()
@@ -171,7 +171,7 @@ bool ConnectedClient::disconnect()
 	while (!mainPackets.empty())
 		mainPackets.pop();
 
-	log_colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
+	LOG::colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
 
 	disconnected = true;
 
@@ -190,14 +190,14 @@ void ConnectedClient::saveData() {
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	log_raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"
@@ -292,7 +292,7 @@ void ConnectedClient::receiverThread()
 	readSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
+	LOG::colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -307,7 +307,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				log_colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
+				LOG::colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -318,7 +318,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				log_colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
+				LOG::colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -344,7 +344,7 @@ void ConnectedClient::senderThread()
 	writeSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	log_colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
+	LOG::colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
 }
 
 
@@ -373,7 +373,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		}
 		else if (!respSize) {
 			// Соединение сброшено
-			log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 			return 1;
 		}
 		else {
@@ -387,12 +387,12 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			else if (err == WSAEMSGSIZE) {
 				// Размер пакета превысил размер буфера
 				// Вывести предупреждение
-				log_raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				LOG::raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
 			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
 				// Соединение сброшено
-				log_raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
 				return 2;
 			}
 			else {
@@ -442,12 +442,12 @@ void ConnectedClient::setState(ClientState state)
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSocket);
 	default:
-		log_colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
+		LOG::colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
 		return;
 }
 #undef PRINT_STATE
 
-	log_colored(ConsoleColor::Info, "State changed to: %s", state_desc);
+	LOG::colored(ConsoleColor::Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

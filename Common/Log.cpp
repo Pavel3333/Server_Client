@@ -19,14 +19,14 @@ static void setConsoleColor(ConsoleColor color)
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), static_cast<WORD>(color));
 }
 
-void log_raw_nonl(std::string_view str)
+void LOG::raw_nonl(std::string_view str)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	cout << str;
 }
 
-void log_raw_colored(ConsoleColor color, std::string_view str)
+void LOG::raw_colored(ConsoleColor color, std::string_view str)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
@@ -35,14 +35,14 @@ void log_raw_colored(ConsoleColor color, std::string_view str)
 	setConsoleColor(ConsoleColor::Default);
 }
 
-void log_raw(std::string_view str)
+void LOG::raw(std::string_view str)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
 	cout << str << endl;
 }
 
-void log_nonl(const char* fmt, ...)
+void LOG::nonl(const char* fmt, ...)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
@@ -52,7 +52,7 @@ void log_nonl(const char* fmt, ...)
 	va_end(args);
 }
 
-void log_colored(ConsoleColor color, const char* fmt, ...)
+void LOG::colored(ConsoleColor color, const char* fmt, ...)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
@@ -65,7 +65,7 @@ void log_colored(ConsoleColor color, const char* fmt, ...)
 	cout << endl;
 }
 
-void log(const char* fmt, ...)
+void LOG::log(const char* fmt, ...)
 {
 	std::lock_guard lock(msg_mutex);
 	printThreadDesc();
