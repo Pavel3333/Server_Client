@@ -7,12 +7,15 @@
 #include "ConnectedClient.h"
 
 enum class ServerState {
-	InitWinSock,
-	CreateReadSocket,
-	CreateWriteSocket,
-	Bind,
-	Connect,
-	CloseSockets
+    InitWinSock,
+    CreateReadSocket,
+    CreateWriteSocket,
+    Bind,
+    SetOpts,
+    Listen,
+    Waiting,
+    Connect,
+    CloseSockets
 };
 
 typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
