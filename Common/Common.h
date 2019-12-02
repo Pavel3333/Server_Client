@@ -18,3 +18,4 @@ const int TIMEOUT = 3;
 
 #include "Log.h"
 #include "Packet.h"
+#include "Error.h"

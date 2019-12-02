@@ -5,10 +5,10 @@
 constexpr uint16_t READ_PORT  = 27011;
 constexpr uint16_t WRITE_PORT = 27010;
 
-int start()
+ERR start()
 {
 	if (Server::getInstance().startServer(READ_PORT, WRITE_PORT) > 0) // Произошла ошибка
-		return 1;
+		return ERR::E_START_SERVER;
 
 	Server::getInstance().printCommandsList();
 	Cleaner::getInstance().printCommandsList();
@@ -61,15 +61,18 @@ int start()
 	if (!Server::getInstance().isRunning())
 		Server::getInstance().closeServer();
 
-	return 0;
+	return ERR::OK;
 }
 
 int main()
 {
+    ERR err = ERR::OK;
+
 	// Задать имя потоку
 	setThreadDesc(L"[main]");
 
-	if (int err = start())
+    err = start();
+	if (_ERROR(err))
 		LOG::colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
 
 	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of server");

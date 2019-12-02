@@ -284,6 +284,8 @@ void Server::save()
 int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
 {
 	int err = 0;
+    
+    size_t processed = 0;
 	clients_mutex.lock();
 
 	for (auto pair : clientPool) {
@@ -296,7 +298,7 @@ int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedCli
 	}
 
 	clients_mutex.unlock();
-	return err;
+	return err ? err : processed;
 }
 
 // Инициализация сокета по порту

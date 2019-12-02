@@ -6,13 +6,6 @@
 #include "Common.h"
 
 
-enum class ERROR_TYPE {
-	OK = 0,        // Без ошибок
-	WARNING,       // Предупреждение
-	SOFT_ERROR,    // Ошибка
-	CRITICAL_ERROR // Критическая ошибка
-};
-
 enum class ClientState {
 	InitWinSock,
 	SetOpts,
