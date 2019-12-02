@@ -90,16 +90,10 @@ void Server::closeServer()
 // Получение числа активных клиентов
 size_t Server::getActiveClientsCount()
 {
-	size_t counter = 0;
-
-	size_t* ctr_ptr = &counter;
-
-	processClientsByPair(
+	return processClientsByPair(
 		true, // Увеличивать counter только для активных клиентов
-		[ctr_ptr](ConnectedClient& client) -> int { (*ctr_ptr)++; return 0; }
+		nullptr
 	);
-
-	return counter;
 }
 
 // Нахождение клиента, удовлетворяющего условию
@@ -260,13 +254,13 @@ void Server::sendAll(PacketPtr packet)
 		packet = PacketFactory::create(cmd.data(), cmd.size(), false);
 	}
 
-	processClientsByPair(
+	size_t count = processClientsByPair(
 		true,
 		[packet](ConnectedClient& client) -> int
 		{ client.sendPacket(packet); return 0; }
 	);
 
-	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended!");
+	LOG::colored(ConsoleColor::SuccessHighlighted, "Data was successfully sended to %u clients", count);
 }
 
 // Сохранение данных клиентов
@@ -280,8 +274,8 @@ void Server::save()
 	LOG::colored(ConsoleColor::SuccessHighlighted, "Data was successfully saved!");
 }
 
-// Обход списка клиентов и их обработка функцией handler
-int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
+// Обход списка клиентов и их обработка функцией handler. Возвращает количество успешно обработанных клиентов.
+size_t Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler)
 {
 	int err = 0;
     
@@ -293,12 +287,16 @@ int Server::processClientsByPair(bool onlyActive, std::function<int(ConnectedCli
 
 		if (onlyActive && !client.isRunning()) continue;
 
-		err = handler(client);
-		if (err) break; // В случае ошибки прервать выполнение
+        if (handler) {
+            err = handler(client);
+            if (err) break; // В случае ошибки прервать выполнение
+        }
+
+        processed++;
 	}
 
 	clients_mutex.unlock();
-	return err ? err : processed;
+	return err ? 0 : processed;
 }
 
 // Инициализация сокета по порту

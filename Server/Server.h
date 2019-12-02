@@ -51,7 +51,7 @@ public:
 
 	void save();
 
-	int processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler);
+    size_t processClientsByPair(bool onlyActive, std::function<int(ConnectedClient&)> handler);
 
 	// Instances
 
