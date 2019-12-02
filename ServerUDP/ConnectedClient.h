@@ -76,8 +76,8 @@ private:
 	int handlePacketIn(std::function<int(PacketPtr)>handler, bool closeAfterTimeout);
 	int handlePacketOut(PacketPtr packet);
 
-	void receiverThread();
-	void senderThread();
+	void handle_receive();
+	void handle_send();
 
 	int receiveData(PacketPtr& dest, bool closeAfterTimeout);
 	int sendData(PacketPtr packet);

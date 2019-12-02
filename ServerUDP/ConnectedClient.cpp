@@ -111,8 +111,8 @@ void ConnectedClient::createThreads()
 	started      = true;
 	disconnected = false;
 
-	receiver = std::thread(&ConnectedClient::receiverThread, this);
-	sender   = std::thread(&ConnectedClient::senderThread,   this);
+	receiver = std::thread(&ConnectedClient::handle_receive, this);
+	sender   = std::thread(&ConnectedClient::handle_send,   this);
 }
 
 // Сброс портов и сокетов
@@ -254,7 +254,7 @@ int ConnectedClient::handlePacketOut(PacketPtr packet)
 
 
 // Поток обработки входящих пакетов
-void ConnectedClient::receiverThread()
+void ConnectedClient::handle_receive()
 {
 	// Задать имя потоку
 	setThreadDesc(L"[Client %d][Receiver]", ID);
@@ -296,7 +296,7 @@ void ConnectedClient::receiverThread()
 }
 
 // Поток отправки пакетов
-void ConnectedClient::senderThread()
+void ConnectedClient::handle_send()
 {
 	// Задать имя потоку
 	setThreadDesc(L"[Client %d][Sender]", ID);
