@@ -1,6 +1,8 @@
 #pragma once
 #include <atomic>
 
+#include "Error.h"
+
 
 class Packet;
 typedef std::shared_ptr<Packet> PacketPtr;
@@ -44,6 +46,8 @@ private:
 #pragma pack(pop)
 };
 
+// TODO: struct DataPacket - пакет, у которого в заголовке token (для идентификации отправителя)
+
 
 std::ostream& operator<< (std::ostream& os, Packet& packet);
 
@@ -84,36 +88,35 @@ private:
 };
 
 
-// Hello-packets
+// Auth packets
 
 #pragma pack(push,1)
-struct ServerHelloPacket {
-	uint32_t clientID;
+struct ServerAuthPacket {
+    SERVER_ERR errorCode;
+    uint8_t tokenSize : TOKEN_BITCNT;
+    char    token[TOKEN_MAX_SIZE];
 };
 
-struct ClientConnectPacket {
-	uint32_t ver;
-};
-
-struct ClientHelloPacket {
-	ClientHelloPacket() {
-		serverHelloPacketID = ~0;
-		login[0] = '\0';
+struct ClientAuthPacket {
+    ClientAuthPacket() {
+		loginSize =  0;
+		passSize  =  0;
 	}
 
-	ClientHelloPacket(uint32_t ID, std::string_view login) {
-		serverHelloPacketID = ID;
-		loginSize = (uint32_t)min(login.size(), LOGIN_MAX_SIZE - 1);
-		memcpy(this->login, login.data(), loginSize);
-		this->login[loginSize] = '\0';
+    ClientAuthPacket(std::string_view login, std::string_view pass) {
+        loginSize = static_cast<uint8_t>(min(login.size(), LOGIN_MAX_SIZE));
+		passSize  = static_cast<uint8_t>(min(pass.size(),  PWD_MAX_SIZE));
+		memcpy(this->login,             login.data(), loginSize);
+		memcpy(this->login + loginSize, pass.data(),  passSize);
 	}
 
-	uint32_t serverHelloPacketID;
-	uint32_t loginSize;
+    uint8_t  loginSize : LOGIN_BITCNT;
+    uint8_t  passSize  : PWD_BITCNT;
 	char     login[LOGIN_MAX_SIZE];
+    char     pass [PWD_MAX_SIZE];
 };
 
 // check packing
-static_assert(sizeof(ServerHelloPacket) == 4);
-static_assert(sizeof(ClientHelloPacket) == 8 + LOGIN_MAX_SIZE);
+static_assert(sizeof(ServerAuthPacket) == 5 + TOKEN_MAX_SIZE);
+static_assert(sizeof(ClientAuthPacket) == 2 + LOGIN_MAX_SIZE + PWD_MAX_SIZE);
 #pragma pack(pop)

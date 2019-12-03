@@ -32,7 +32,7 @@ void LOG::raw_colored(ConsoleColor color, std::string_view str)
 	printThreadDesc();
 	setConsoleColor(color);
 	cout << str << endl;
-	setConsoleColor(ConsoleColor::Default);
+	setConsoleColor(CC_Default);
 }
 
 void LOG::raw(std::string_view str)
@@ -61,7 +61,7 @@ void LOG::colored(ConsoleColor color, const char* fmt, ...)
 	va_start(args, fmt);
 	vprintf_s(fmt, args);
 	va_end(args);
-	setConsoleColor(ConsoleColor::Default);
+	setConsoleColor(CC_Default);
 	cout << endl;
 }
 
@@ -93,9 +93,9 @@ void __wsa_print_err(const char* file, int line)
 		NULL, err, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
 		err_msg, sizeof(err_msg), NULL);
 
-	setConsoleColor(ConsoleColor::DangerHighlighted);
+	setConsoleColor(CC_DangerHL);
 	printf("%s:%d - WSA Error %d:\n%s", file, line, err, err_msg);
-	setConsoleColor(ConsoleColor::Default);
+	setConsoleColor(CC_Default);
 }
 
 

@@ -20,90 +20,13 @@ ConnectedClient::ConnectedClient(uint16_t ID, sockaddr_in clientDesc, int client
 	inet_ntop(AF_INET, &(clientDesc.sin_addr), IP_str, 16);                          // get IP addr string
 	getnameinfo((sockaddr*)&clientDesc, clientLen, host, NI_MAXHOST, NULL, NULL, 0); // get host
 
-	LOG::colored(ConsoleColor::InfoHighlighted, "Client %d (IP: %s, host: %s) connected!", ID, IP_str, host);
+	LOG::colored(CC_InfoHL, "Client %d (IP: %s, host: %s) connected!", ID, IP_str, host);
 }
 
 ConnectedClient::~ConnectedClient() {
 	disconnect();
 }
 
-
-// Первое рукопожатие с соединенным клиентом
-void ConnectedClient::first_handshake(SOCKET socket, uint16_t port)
-{
-	// Присвоить сокет на запись
-	setState(ClientState::FirstHandshake);
-
-	readPort    = port;
-	writeSocket = socket;
-
-	LOG::colored(ConsoleColor::SuccessHighlighted, "Client %d: first handshake was successful!", ID);
-	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Read port: %d", ID, readPort);
-}
-
-// Второе рукопожатие с соединенным клиентом
-int ConnectedClient::second_handshake(SOCKET socket, uint16_t port)
-{
-	// Присвоить сокет на чтение
-	setState(ClientState::SecondHandshake);
-
-	writePort  = port;
-	readSocket = socket;
-
-	// Отправить Hello пакет
-	setState(ClientState::HelloSending);
-
-	ServerHelloPacket serverHelloRaw { ID };
-
-	PacketPtr serverHello = PacketFactory::create(reinterpret_cast<const char*>(&serverHelloRaw), sizeof(serverHelloRaw), true);
-
-	if (sendData(serverHello))
-		return 1;
-
-	// Принять Hello пакет от клиента и обработать
-	setState(ClientState::HelloReceiving);
-
-	PacketPtr clientHello;
-
-	started = true;
-	int err = receiveData(clientHello, true);
-	started = false;
-
-	if (err > 0)
-		// Критическая ошибка или соединение сброшено
-		return 2;
-
-	// Обработка пакета
-
-	if (!clientHello)
-		// Пришел пустой пакет
-		return 3;
-	else if (clientHello->getDataSize() != sizeof(ClientHelloPacket))
-		// Пакет не совпадает по размеру
-		return 4;
-
-	ClientHelloPacket clientHelloRaw;
-	memcpy(&clientHelloRaw, clientHello->getData(), clientHello->getDataSize());
-
-	if (clientHelloRaw.serverHelloPacketID != serverHello->getID())
-		// Пришедший ID пакета от сервера
-		// не совпадает с реальным значением
-		return 5;
-	else if (clientHelloRaw.loginSize > LOGIN_MAX_SIZE)
-		// Пришедший размер логина
-		// превышает максимальный
-		return 6;
-
-	login = std::string(clientHelloRaw.login, clientHelloRaw.loginSize);
-	std::hash<std::string> hashObj;
-	loginHash = hashObj(login);
-
-	LOG::colored(ConsoleColor::SuccessHighlighted, "Client %d: second handshake was successful!", ID);
-	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Login: %.*s",    ID, login.size(), login.data());
-	LOG::colored(ConsoleColor::InfoHighlighted,    "Client %d: Write port: %d", ID, writePort);
-
-	return 0;
-}
 
 // Создание потоков
 void ConnectedClient::createThreads()
@@ -128,23 +51,23 @@ void ConnectedClient::resetSocketsAndPorts()
 // Вывести информацию о клиенте
 void ConnectedClient::printInfo(bool ext)
 {
-	LOG::colored(ConsoleColor::InfoHighlighted, "Client %d {", ID);
+	LOG::colored(CC_InfoHL, "Client %d {", ID);
 
 	const char* status = isRunning() ? "connected" : "disconnected";
 
-	LOG::colored(ConsoleColor::InfoHighlighted, "  status: %s", status);
-	LOG::colored(ConsoleColor::InfoHighlighted, "  login : %.*s", login.size(), login.data());
-	LOG::colored(ConsoleColor::InfoHighlighted, "  IP    : %s", IP_str);
-	LOG::colored(ConsoleColor::InfoHighlighted, "  host  : %s", host);
+	LOG::colored(CC_InfoHL, "  status: %s", status);
+	LOG::colored(CC_InfoHL, "  login : %.*s", login.size(), login.data());
+	LOG::colored(CC_InfoHL, "  IP    : %s", IP_str);
+	LOG::colored(CC_InfoHL, "  host  : %s", host);
 
 	if (ext) {
-		LOG::colored(ConsoleColor::InfoHighlighted, "  received:      %d", receivedPackets.size());
-		LOG::colored(ConsoleColor::InfoHighlighted, "  sended:        %d", sendedPackets.size());
-		LOG::colored(ConsoleColor::InfoHighlighted, "  in main queue: %d", mainPackets.size());
-		LOG::colored(ConsoleColor::InfoHighlighted, "  in sync queue: %d", syncPackets.size());
+		LOG::colored(CC_InfoHL, "  received:      %d", receivedPackets.size());
+		LOG::colored(CC_InfoHL, "  sended:        %d", sendedPackets.size());
+		LOG::colored(CC_InfoHL, "  in main queue: %d", mainPackets.size());
+		LOG::colored(CC_InfoHL, "  in sync queue: %d", syncPackets.size());
 	}
 
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "}");
+	LOG::raw_colored(CC_InfoHL, "}");
 }
 
 bool ConnectedClient::disconnect()
@@ -171,7 +94,7 @@ bool ConnectedClient::disconnect()
 	while (!mainPackets.empty())
 		mainPackets.pop();
 
-	LOG::colored(ConsoleColor::InfoHighlighted, "Connected client %d was stopped", ID);
+	LOG::colored(CC_InfoHL, "Connected client %d was stopped", ID);
 
 	disconnected = true;
 
@@ -190,14 +113,14 @@ void ConnectedClient::saveData() {
 // Обработать пакет ACK
 int ConnectedClient::ack_handler(PacketPtr packet)
 {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int ConnectedClient::any_packet_handler(PacketPtr packet)
 {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
 
 	/*std::string_view resp =
 		"HTTP / 1.1 200 OK\r\n"
@@ -292,7 +215,7 @@ void ConnectedClient::receiverThread()
 	readSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	LOG::colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
+	LOG::colored(CC_InfoHL, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -307,7 +230,7 @@ void ConnectedClient::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				LOG::colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
+				LOG::colored(CC_Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -318,7 +241,7 @@ void ConnectedClient::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				LOG::colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
+				LOG::colored(CC_Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -344,7 +267,7 @@ void ConnectedClient::senderThread()
 	writeSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	LOG::colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
+	LOG::colored(CC_InfoHL, "Sender thread closed");
 }
 
 
@@ -373,7 +296,7 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		}
 		else if (!respSize) {
 			// Соединение сброшено
-			LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			LOG::raw_colored(CC_InfoHL, "Connection closed");
 			return 1;
 		}
 		else {
@@ -387,12 +310,12 @@ int ConnectedClient::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			else if (err == WSAEMSGSIZE) {
 				// Размер пакета превысил размер буфера
 				// Вывести предупреждение
-				LOG::raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				LOG::raw_colored(CC_WarningHL, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
 			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
 				// Соединение сброшено
-				LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				LOG::raw_colored(CC_InfoHL, "Connection closed");
 				return 2;
 			}
 			else {
@@ -442,12 +365,12 @@ void ConnectedClient::setState(ClientState state)
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSocket);
 	default:
-		LOG::colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
+		LOG::colored(CC_WarningHL, "Unknown state: %d", (int)state);
 		return;
 }
 #undef PRINT_STATE
 
-	LOG::colored(ConsoleColor::Info, "State changed to: %s", state_desc);
+	LOG::colored(CC_Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

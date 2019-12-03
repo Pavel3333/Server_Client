@@ -19,7 +19,7 @@ void Cleaner::startCleaner()
 
 	mode = CleanerMode::OnlyDisconnect;
 
-	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner enabled!");
+	LOG::raw_colored(CC_SuccessHL, "Cleaner enabled!");
 	printMode();
 	printCommandsList();
 }
@@ -35,20 +35,20 @@ void Cleaner::closeCleaner()
 	if (cleaner.joinable())
 		cleaner.join();
 
-	LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner disabled!");
+	LOG::raw_colored(CC_SuccessHL, "Cleaner disabled!");
 	printCommandsList();
 }
 
 
 // Напечатать команды клинера
 void Cleaner::printCommandsList() {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Commands for managing the cleaner:");
+	LOG::raw_colored(CC_InfoHL, "Commands for managing the cleaner:");
 	if (!started)
-		LOG::raw_colored(ConsoleColor::Info,        "  \"enable_cleaner\"      => Enable inactive clients cleaner");
+		LOG::raw_colored(CC_Info,        "  \"enable_cleaner\"      => Enable inactive clients cleaner");
 	else {
-		LOG::raw_colored(ConsoleColor::Info,        "  \"get_cleaner_mode\"    => Print cleaner mode");
-		LOG::raw_colored(ConsoleColor::Info,        "  \"change_cleaner_mode\" => Change cleaner mode");
-		LOG::raw_colored(ConsoleColor::Warning,     "  \"disable_cleaner\"     => Disable inactive clients cleaner");
+		LOG::raw_colored(CC_Info,        "  \"get_cleaner_mode\"    => Print cleaner mode");
+		LOG::raw_colored(CC_Info,        "  \"change_cleaner_mode\" => Change cleaner mode");
+		LOG::raw_colored(CC_Warning,     "  \"disable_cleaner\"     => Disable inactive clients cleaner");
 	}
 }
 
@@ -67,15 +67,15 @@ void Cleaner::printMode() {
 			modeDesc = "Invalid";
 	}
 
-	LOG::colored(ConsoleColor::InfoHighlighted, "Cleaner mode: %s", mode);
+	LOG::colored(CC_InfoHL, "Cleaner mode: %s", mode);
 }
 
 void Cleaner::changeMode() {
 	uint8_t cmd;
 	
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Type the desired mode:");
-	LOG::colored(ConsoleColor::Info,                "  %d - Only disconnect", CleanerMode::OnlyDisconnect);
-	LOG::colored(ConsoleColor::Info,                "  %d - Agressive mode",  CleanerMode::AgressiveMode);
+	LOG::raw_colored(CC_InfoHL, "Type the desired mode:");
+	LOG::colored(CC_Info,                "  %d - Only disconnect", CleanerMode::OnlyDisconnect);
+	LOG::colored(CC_Info,                "  %d - Agressive mode",  CleanerMode::AgressiveMode);
 
 	std::cin >> cmd;
 
@@ -83,10 +83,10 @@ void Cleaner::changeMode() {
 		case (uint8_t)(CleanerMode::OnlyDisconnect):
 		case (uint8_t)(CleanerMode::AgressiveMode):
 			mode = (CleanerMode)cmd;
-			LOG::raw_colored(ConsoleColor::SuccessHighlighted, "Cleaner mode changed successfully!");
+			LOG::raw_colored(CC_SuccessHL, "Cleaner mode changed successfully!");
 			break;
 		default:
-			LOG::raw_colored(ConsoleColor::WarningHighlighted, "Invalid mode was typed");
+			LOG::raw_colored(CC_WarningHL, "Invalid mode was typed");
 	}
 }
 
@@ -123,10 +123,10 @@ void Cleaner::cleanInactiveClients(bool ext)
 		if (mode == CleanerMode::AgressiveMode)
 			verb = "Cleaned";
 		
-		LOG::colored(ConsoleColor::InfoHighlighted, "%s %d inactive clients", verb, cleaned);
+		LOG::colored(CC_InfoHL, "%s %d inactive clients", verb, cleaned);
 	}
 	else if (ext)
-		LOG::raw_colored(ConsoleColor::InfoHighlighted, "All clients are active");
+		LOG::raw_colored(CC_InfoHL, "All clients are active");
 }
 
 // Каждые 5 секунд очищать неактивных клиентов

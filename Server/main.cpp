@@ -2,12 +2,12 @@
 #include "Server.h"
 #include "Cleaner.h"
 
-constexpr uint16_t READ_PORT  = 27011;
-constexpr uint16_t WRITE_PORT = 27010;
+constexpr uint16_t AUTH_PORT = 27010;
+constexpr uint16_t DATA_PORT = 27011;
 
 ERR start()
 {
-	if (Server::getInstance().startServer(READ_PORT, WRITE_PORT) > 0) // Произошла ошибка
+	if (Server::getInstance().startServer(AUTH_PORT) > 0) // Произошла ошибка
 		return ERR::E_START_SERVER;
 
 	Server::getInstance().printCommandsList();
@@ -61,21 +61,21 @@ ERR start()
 	if (!Server::getInstance().isRunning())
 		Server::getInstance().closeServer();
 
-	return ERR::OK;
+	return E_OK;
 }
 
 int main()
 {
-    ERR err = ERR::OK;
+    ERR err = E_OK;
 
 	// Задать имя потоку
 	setThreadDesc(L"[main]");
 
     err = start();
 	if (_ERROR(err))
-		LOG::colored(ConsoleColor::DangerHighlighted, "Server creating failed - error: %d", err);
+		LOG::colored(CC_DangerHL, "Server creating failed - error: %d", err);
 
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of server");
+	LOG::raw_colored(CC_InfoHL, "Press any button to end execution of server");
 
 	int v;
 	std::cin >> v; // Чтобы не закрывалось окно

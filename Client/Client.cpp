@@ -2,16 +2,16 @@
 #include <array>
 #include "Client.h"
 
-int Client::init(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t writePort)
+int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort)
 {
-	// Init class members
-	this->readSocket = INVALID_SOCKET;
-	this->writeSocket = INVALID_SOCKET;
+    int err;
 
-	this->readPort = readPort;
-	this->writePort = writePort;
+	// Init class members
+	this->authSocket = INVALID_SOCKET;
+
+	this->authPort = authPort;
+	this->dataPort = dataPort;
 	this->ID = 0;
-	this->login = login;
 	this->IP = IP;
 	this->started = false;
 
@@ -20,14 +20,34 @@ int Client::init(std::string_view login, PCSTR IP, uint16_t readPort, uint16_t w
 
 	WSADATA wsaData;
 
-	int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	err = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (err != NO_ERROR) {
 		wsa_print_err();
 		return 1;
 	}
 
-	if (err = handshake())
-		return err;
+    // Create an authorization socket
+    setState(ClientState::CreateAuthSocket);
+
+    authSocket = connect2server(authPort, IPPROTO_TCP);
+    if (authSocket == INVALID_SOCKET)
+        return 2;
+
+    started = true;
+
+    LOG::colored(CC_SuccessHL, "The client is authorizing on the %d port", authPort);
+
+    err = authorize(login, pass);
+	if (err) return err;
+
+    // Create an authorization socket
+    setState(ClientState::CreateDataSocket);
+
+    dataSocket = connect2server(dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
+    if (dataSocket == INVALID_SOCKET)
+        return 3;
+
+    //createThreads();
 
 	return 0;
 }
@@ -58,133 +78,136 @@ void Client::disconnect()
 
 	WSACleanup();
 
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "The client was stopped");
+	LOG::raw_colored(CC_InfoHL, "The client was stopped");
 }
 
 void Client::printCommandsList() const
 {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "You can use these commands to manage the client:");
-	LOG::raw_colored(ConsoleColor::Info,   "  \"send\"     => Send the packet to server");
-	LOG::raw_colored(ConsoleColor::Info,   "  \"commands\" => Print all available commands");
-	LOG::raw_colored(ConsoleColor::Danger, "  \"close\"    => Close the client");
+	LOG::raw_colored(CC_InfoHL, "You can use these commands to manage the client:");
+	LOG::raw_colored(CC_Info,   "  \"send\"     => Send the packet to server");
+	LOG::raw_colored(CC_Info,   "  \"commands\" => Print all available commands");
+	LOG::raw_colored(CC_Danger, "  \"close\"    => Close the client");
 }
 
 
-SOCKET Client::connect2server(uint16_t port)
+SOCKET Client::connect2server(uint16_t port, IPPROTO protocol)
 {
+    int err;
+
 	SOCKET result = INVALID_SOCKET;
+    int sock_type;
 
-	sockaddr_in socketDesc;
+    switch (protocol) {
+    case IPPROTO_TCP:
+        sock_type = SOCK_STREAM;
+        break;
+    case IPPROTO_UDP:
+        sock_type = SOCK_DGRAM;
+        break;
+    default:
+        LOG::colored(CC_DangerHL, "Invalid protocol: %d", protocol);
+    }
+         
+    sockaddr_in serverAddr {
+        AF_INET,
+        htons(port)
+    };
 
-	socketDesc.sin_family = AF_INET;
-	socketDesc.sin_port = htons(port);
-	inet_pton(AF_INET, IP, &(socketDesc.sin_addr.s_addr));
+	//socketDesc.sin_family = AF_INET;
+	//socketDesc.sin_port = htons(port);
+	inet_pton(AF_INET, IP, &(serverAddr.sin_addr.s_addr));
 
-	//result = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	result = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	result = socket(AF_INET, sock_type, protocol);
 	if (result == INVALID_SOCKET) {
 		wsa_print_err();
 		return INVALID_SOCKET;
 	}
 
-	// Set socket options
-	setState(ClientState::SetOpts);
+    if (protocol == IPPROTO_TCP) {
+        // Set socket options
+        setState(ClientState::SetOpts);
 
-	uint32_t value = TIMEOUT * 1000;
-	uint32_t size = sizeof(value);
+        uint32_t value = TIMEOUT * 1000;
+        uint32_t size = sizeof(value);
 
-	// Set timeout for sending
-	int err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
-	if (err == SOCKET_ERROR) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
+        // Set timeout for sending
+        int err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
+        if (err == SOCKET_ERROR) {
+            wsa_print_err();
+            return INVALID_SOCKET;
+        }
 
-	// Set timeout for receiving
-	err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
-	if (err == SOCKET_ERROR) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
+        // Set timeout for receiving
+        err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
+        if (err == SOCKET_ERROR) {
+            wsa_print_err();
+            return INVALID_SOCKET;
+        }
+    }
 
 	// Connect to server
-	if (connect(result, (SOCKADDR*)&socketDesc, sizeof(socketDesc)) == SOCKET_ERROR) {
-		int err = WSAGetLastError();
-		if (err == WSAETIMEDOUT)
-			// Таймаут
-			LOG::raw_colored(ConsoleColor::WarningHighlighted, "Unable to connect to the server: timeout");
-		else
-			// Критическая ошибка
-			wsa_print_err();
+    err = connect(result, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
+	if (err == SOCKET_ERROR) {
+		err = WSAGetLastError();
+        switch (err) {
+        case WSAETIMEDOUT:
+            // Таймаут
+            LOG::raw_colored(CC_WarningHL, "Unable to connect to the server: timeout");
+            break;
+        default:
+            // Критическая ошибка
+            wsa_print_err();
+        }
 		return INVALID_SOCKET;
 	}
 
 	return result;
 }
 
-int Client::handshake()
+int Client::authorize(std::string_view login, std::string_view pass)
 {
-	// Create a read socket that receiving data from server
-	setState(ClientState::CreateReadSocket);
+    int err;
 
-	readSocket = connect2server(readPort);
-	if (readSocket == INVALID_SOCKET)
-		return 1;
+	// Authorization
+	setState(ClientState::Auth);
 
-	LOG::colored(ConsoleColor::SuccessHighlighted, "The client can read the data from the port %d", readPort);
+    ClientAuthPacket clientAuthRaw { login, pass };
 
-	Sleep(500); // Задержка нужна для того, чтобы сервер успел принять соединение
+    PacketPtr clientAuth = PacketFactory::create_from_struct(clientAuthRaw, true);
+    if (sendData(clientAuth))
+        return 1;
 
-	// Create a write socket that sending data to the server
-	setState(ClientState::CreateWriteSocket);
-
-	writeSocket = connect2server(writePort);
-	if (writeSocket == INVALID_SOCKET)
-		return 1;
-
-	LOG::colored(ConsoleColor::SuccessHighlighted, "The client can write the data to the port %d", writePort);
-
-	// Receive a Hello packet from the server
-	setState(ClientState::HelloReceiving);
-
-	PacketPtr serverHello;
-
-	started = true;
-	int err = receiveData(serverHello, false);
-	started = false;
+    PacketPtr serverAuth;
+	err = receiveData(serverAuth, false);
 	if (err > 0)
 		// Критическая ошибка или соединение сброшено
 		return 1;
 
-	// Обработка пакета
+	// Packet handling
 
-	if (!serverHello)
-		// Пришел пустой пакет
+	if (!serverAuth)
+		// Empty packet
 		return 2;
-	else if (serverHello->getDataSize() != sizeof(ServerHelloPacket))
-		// Пакет не совпадает по размеру
+	else if (serverAuth->getDataSize() != sizeof(ServerAuthPacket))
+		// Packet size is incorrect
 		return 3;
 
-	auto serverHelloRaw = reinterpret_cast<const ServerHelloPacket*>(
-		serverHello->getData());
+	auto serverAuthRaw = reinterpret_cast<const ServerAuthPacket*>(
+        serverAuth->getData());
 
-	ID = serverHelloRaw->clientID;
+    if (_ERROR(serverAuthRaw->errorCode)) {
+        LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthRaw->errorCode);
+        return 4;
+    }
+    else if (WARNING(serverAuthRaw->errorCode))
+        LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthRaw->errorCode);
 
-	// Send a Hello packet to the server
-	setState(ClientState::HelloSending);
+    if (serverAuthRaw->tokenSize >= TOKEN_MAX_SIZE)
+        return 5;
 
-	ClientHelloPacket clientHelloRaw { serverHello->getID(), login };
+    token = std::string_view(serverAuthRaw->token, serverAuthRaw->tokenSize);
 
-	PacketPtr clientHello = PacketFactory::create_from_struct(clientHelloRaw, true);
-
-	if (sendData(clientHello))
-		return 1;
-
-	started = true;
-
-	LOG::colored(ConsoleColor::SuccessHighlighted, "Client handshaked successfully! Client ID: %d", ID);
-
-	createThreads();
+	LOG::colored(CC_SuccessHL, "Client authorized successfully! Client token: %.*s", token.size(), token.data());
 
 	return 0;
 }
@@ -193,14 +216,14 @@ int Client::handshake()
 // Обработать пакет ACK
 int Client::ack_handler(PacketPtr packet)
 {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
 // Обработать любой входящий пакет
 int Client::any_packet_handler(PacketPtr packet)
 {
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, std::string_view(packet->getData(), packet->getDataSize()));
+	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
 	return 0;
 }
 
@@ -265,21 +288,21 @@ void Client::receiverThread()
 	// Сбрасываем соединение (сокет для чтения)
 	setState(ClientState::Shutdown);
 
-	if (readSocket != INVALID_SOCKET)
-		if (shutdown(readSocket, SD_BOTH) == SOCKET_ERROR)
+	if (dataSocket != INVALID_SOCKET)
+		if (shutdown(dataSocket, SD_RECEIVE) == SOCKET_ERROR)
 			wsa_print_err();
 
 	// Закрытие сокета (чтение)
 	setState(ClientState::CloseSocket);
 
-	if (readSocket != INVALID_SOCKET)
-		if (closesocket(readSocket) == SOCKET_ERROR)
+	if (dataSocket != INVALID_SOCKET)
+		if (closesocket(dataSocket) == SOCKET_ERROR)
 			wsa_print_err();
 
-	readSocket = INVALID_SOCKET;
+	dataSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	LOG::colored(ConsoleColor::InfoHighlighted, "Receiver thread closed");
+	LOG::colored(CC_InfoHL, "Receiver thread closed");
 }
 
 // Поток отправки пакетов
@@ -294,7 +317,7 @@ void Client::senderThread()
 			PacketPtr packet = mainPackets.back();
 
 			if (handlePacketOut(packet)) {
-				LOG::colored(ConsoleColor::Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
+				LOG::colored(CC_Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
 				syncPackets.push_back(packet);
 			}
 
@@ -305,7 +328,7 @@ void Client::senderThread()
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
 			if (handlePacketOut(*packetIt)) {
-				LOG::colored(ConsoleColor::Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
+				LOG::colored(CC_Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
 				packetIt++;
 			}
 			else packetIt = syncPackets.erase(packetIt);
@@ -317,21 +340,22 @@ void Client::senderThread()
 	// Сбрасываем соединение (сокет для записи)
 	setState(ClientState::Shutdown);
 
-	if (writeSocket != INVALID_SOCKET)
-		if (shutdown(writeSocket, SD_BOTH) == SOCKET_ERROR)
+	if (dataSocket != INVALID_SOCKET)
+		if (shutdown(dataSocket, SD_SEND) == SOCKET_ERROR)
 			wsa_print_err();
 
+    // TODO: закрывать сокет нужно только после того, как сокет будет закрыт на чтение
 	// Закрытие сокета (запись)
 	setState(ClientState::CloseSocket);
 
-	if (writeSocket != INVALID_SOCKET)
-		if (closesocket(writeSocket) == SOCKET_ERROR)
+	if (dataSocket != INVALID_SOCKET)
+		if (closesocket(dataSocket) == SOCKET_ERROR)
 			wsa_print_err();
 
-	writeSocket = INVALID_SOCKET;
+	dataSocket = INVALID_SOCKET;
 
 	// Завершаем поток
-	LOG::colored(ConsoleColor::InfoHighlighted, "Sender thread closed");
+	LOG::colored(CC_InfoHL, "Sender thread closed");
 }
 
 // Создание потоков
@@ -355,7 +379,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		// - после закрытия соединения,
 		// - после таймаута (см. closeAfterTimeout)
 
-		int respSize = recv(readSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
+		int respSize = recv(dataSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
 		if      (respSize > 0) {
 			// Записываем данные от сервера
 			dest = PacketFactory::create(respBuff.data(), respSize);
@@ -367,7 +391,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		}
 		else if (!respSize) {
 			// Соединение сброшено
-			LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+			LOG::raw_colored(CC_InfoHL, "Connection closed");
 			return 1;
 		}
 		else {
@@ -381,12 +405,12 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			else if (err == WSAEMSGSIZE) {
 				// Размер пакета превысил размер буфера
 				// Вывести предупреждение
-				LOG::raw_colored(ConsoleColor::WarningHighlighted, "The size of received packet is larger than the buffer size!");
+				LOG::raw_colored(CC_WarningHL, "The size of received packet is larger than the buffer size!");
 				return -2;
 			}
 			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
 				// Соединение сброшено
-				LOG::raw_colored(ConsoleColor::InfoHighlighted, "Connection closed");
+				LOG::raw_colored(CC_InfoHL, "Connection closed");
 				return 2;
 			}
 			else {
@@ -405,7 +429,7 @@ int Client::sendData(PacketPtr packet)
 {
 	setState(ClientState::Send);
 
-	if (packet->send(writeSocket) == SOCKET_ERROR) {
+	if (packet->send(dataSocket) == SOCKET_ERROR) {
 		wsa_print_err();
 		return 1;
 	}
@@ -429,21 +453,20 @@ void Client::setState(ClientState state)
 	switch (state) {
 		PRINT_STATE(InitWinSock);
 		PRINT_STATE(SetOpts);
-		PRINT_STATE(CreateReadSocket);
-		PRINT_STATE(CreateWriteSocket);
-		PRINT_STATE(HelloReceiving);
-		PRINT_STATE(HelloSending);
+		PRINT_STATE(CreateAuthSocket);
+		PRINT_STATE(Auth);
+		PRINT_STATE(CreateDataSocket);
 		PRINT_STATE(Send);
 		PRINT_STATE(Receive);
 		PRINT_STATE(Shutdown);
 		PRINT_STATE(CloseSocket);
 	default:
-		LOG::colored(ConsoleColor::WarningHighlighted, "Unknown state: %d", (int)state);
+		LOG::colored(CC_WarningHL, "Unknown state: %d", (int)state);
 		return;
 	}
 #undef PRINT_STATE
 
-	LOG::colored(ConsoleColor::Info, "State changed to: %s", state_desc);
+	LOG::colored(CC_Info, "State changed to: %s", state_desc);
 #endif
 
 	this->state = state;

@@ -6,10 +6,12 @@
 #include "Common.h"
 #include "ConnectedClient.h"
 
+// 10 clients limit
+constexpr uint8_t MAX_CLIENT_COUNT = 10;
+
 enum class ServerState {
 	InitWinSock,
-	CreateReadSocket,
-	CreateWriteSocket,
+	CreateAuthSocket,
 	Bind,
 	SetOpts,
 	Listen,
@@ -28,7 +30,7 @@ public:
 		return instance;
 	}
 
-	int  startServer(uint16_t readPort, uint16_t writePort);
+	int  startServer(uint16_t authPort);
 	void closeServer();
 
 	// Getters
@@ -62,7 +64,7 @@ private:
 
 	int initSockets();
 
-	void processIncomeConnection(bool isReadSocket);
+	void processIncomeConnection();
 
 	void setState(ServerState state);
 
@@ -73,11 +75,9 @@ private:
 
 	ServerState state;
 
-	uint16_t readPort;
-	uint16_t writePort;
+	uint16_t authPort;
 
-	SOCKET listeningReadSocket;
-	SOCKET listeningWriteSocket;
+	SOCKET authSocket;
 
 	// Защита от копирования
 	Server()                   {}

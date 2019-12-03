@@ -7,14 +7,22 @@ enum class ERROR_TYPE {
     CRITICAL_ERROR // Критическая ошибка
 };
 
-enum class ERR {
-    OK = 0,
+enum ERR {
+    E_OK = 0,
 
     E_START_SERVER,
 
-    UNKNOWN
+    E_UNKNOWN
 };
 
-#define SUCCESS(err) (err == ERR::OK)
-#define WARNING(err) (err <  ERR::OK)
-#define _ERROR(err)   (err >  ERR::OK)
+enum SERVER_ERR {
+    SE_OK = 0,
+
+    
+
+    SE_UNKNOWN
+};
+
+#define SUCCESS(err) (err == 0)
+#define WARNING(err) (err <  0)
+#define _ERROR(err)  (err >  0)

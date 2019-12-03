@@ -3,32 +3,45 @@
 #include "Client.h"
 
 
-constexpr uint16_t    READ_PORT  = 27010;
-constexpr uint16_t    WRITE_PORT = 27011;
+constexpr uint16_t    AUTH_PORT  = 27010;
+constexpr uint16_t    DATA_PORT  = 27011;
 constexpr const char* SERVER_IP  = "192.168.0.12";
 
 int start() {
-	std::string cmd;
-	bool err = true;
+    std::string login, pass;
 
-	while (err) {
-		LOG::raw("Please type the login:");
+    while (true) {
+        LOG::raw("Please type the login: ");
 
-		std::cin >> cmd;
-		std::cin.ignore();
+        std::cin >> login;
+        std::cin.ignore();
 
-		if (cmd.size() > LOGIN_MAX_SIZE)
-			LOG::colored(ConsoleColor::DangerHighlighted, "Login size must be less than %d!", LOGIN_MAX_SIZE);
-		else
-			err = false;
-	}
+        if (login.size() >= UINT8_MAX) {
+            LOG::raw_colored(CC_WarningHL, "Too long login. Please retry");
+            continue;
+        }
+
+        LOG::raw("Please type the password: ");
+
+        std::cin >> pass;
+        std::cin.ignore();
+
+        if (pass.size() >= UINT8_MAX) {
+            LOG::raw_colored(CC_WarningHL, "Too long password. Please retry");
+            continue;
+        }
+
+        break;
+    }
+
+    std::string cmd;
 
 	uint8_t ctr_reconnect = 1;
 
 	while (ctr_reconnect <= 5) {
-		LOG::colored(ConsoleColor::InfoHighlighted, "%d connect to the server...", ctr_reconnect);
+		LOG::colored(CC_InfoHL, "%d connect to the server...", ctr_reconnect);
 
-		if (Client::getInstance().init(cmd, SERVER_IP, READ_PORT, WRITE_PORT)) {
+		if (Client::getInstance().init(login, pass, SERVER_IP, AUTH_PORT, DATA_PORT)) {
 			ctr_reconnect++;
 			continue;
 		}
@@ -40,7 +53,7 @@ int start() {
 			std::cin.ignore();
 
 			if (cmd == "send") { // Отправка данных серверу
-				LOG::raw_colored(ConsoleColor::Info, "Please type the data you want to send");
+				LOG::raw_colored(CC_Info, "Please type the data you want to send");
 
 				std::getline(std::cin, cmd);
 
@@ -63,20 +76,23 @@ int start() {
 	}
 
 	if (ctr_reconnect > 5)
-		LOG::raw_colored(ConsoleColor::DangerHighlighted, "Too many connection attempts. Contact the developers");
+		LOG::raw_colored(CC_DangerHL, "Too many connection attempts. Contact the developers");
 
 	return 0;
 }
 
 int main()
 {
+    int err;
+
 	// Задать имя потоку
 	setThreadDesc(L"[main]");
 
-	if (int err = start())
-		LOG::colored(ConsoleColor::DangerHighlighted, "Client creating failed - error: %d", err);
+    err = start();
+	if (err)
+		LOG::colored(CC_DangerHL, "Client creating failed - error: %d", err);
 
-	LOG::raw_colored(ConsoleColor::InfoHighlighted, "Press any button to end execution of client");
+	LOG::raw_colored(CC_InfoHL, "Press any button to end execution of client");
 
 	int v;
 	std::cin >> v; // Чтобы не закрывалось окно
