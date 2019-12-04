@@ -7,8 +7,6 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
     int err;
 
 	// Init class members
-	this->authSocket = INVALID_SOCKET;
-
 	this->authPort = authPort;
 	this->dataPort = dataPort;
 	this->ID = 0;
@@ -29,8 +27,8 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
     // Create an authorization socket
     setState(ClientState::CreateAuthSocket);
 
-    authSocket = connect2server(authPort, IPPROTO_TCP);
-    if (authSocket == INVALID_SOCKET)
+    err = connect2server(authSocket, authPort, IPPROTO_TCP);
+    if (_ERROR(err))
         return 2;
 
     started = true;
@@ -43,8 +41,8 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
     // Create an authorization socket
     setState(ClientState::CreateDataSocket);
 
-    dataSocket = connect2server(dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
-    if (dataSocket == INVALID_SOCKET)
+    err = connect2server(dataSocket, dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
+    if (_ERROR(err))
         return 3;
 
     //createThreads();
@@ -90,66 +88,35 @@ void Client::printCommandsList() const
 }
 
 
-SOCKET Client::connect2server(uint16_t port, IPPROTO protocol)
+ERR Client::connect2server(Socket& sock, uint16_t port, IPPROTO protocol)
 {
-    int err;
-
-	SOCKET result = INVALID_SOCKET;
-    int sock_type;
-
-    switch (protocol) {
-    case IPPROTO_TCP:
-        sock_type = SOCK_STREAM;
-        break;
-    case IPPROTO_UDP:
-        sock_type = SOCK_DGRAM;
-        break;
-    default:
-        LOG::colored(CC_DangerHL, "Invalid protocol: %d", protocol);
-    }
-         
-    sockaddr_in serverAddr {
-        AF_INET,
-        htons(port)
-    };
-
-	//socketDesc.sin_family = AF_INET;
-	//socketDesc.sin_port = htons(port);
-	inet_pton(AF_INET, IP, &(serverAddr.sin_addr.s_addr));
-
-	result = socket(AF_INET, sock_type, protocol);
-	if (result == INVALID_SOCKET) {
-		wsa_print_err();
-		return INVALID_SOCKET;
-	}
+    ERR err = sock.init(IP, port, protocol);
+    if (!SUCCESS(err))
+        wsa_print_err();
+    if (_ERROR(err))
+        return err;
 
     if (protocol == IPPROTO_TCP) {
         // Set socket options
         setState(ClientState::SetOpts);
 
-        uint32_t value = TIMEOUT * 1000;
-        uint32_t size = sizeof(value);
+        err = sock.setTimeout(TIMEOUT, SO_SNDTIMEO);
+        if (_ERROR(err))
+            return err;
+        else if (WARNING(err))
+            LOG::colored(CC_WarningHL, "Cannot to set send timeout");
 
-        // Set timeout for sending
-        int err = setsockopt(result, SOL_SOCKET, SO_SNDTIMEO, (char *)&value, size);
-        if (err == SOCKET_ERROR) {
-            wsa_print_err();
-            return INVALID_SOCKET;
-        }
-
-        // Set timeout for receiving
-        err = setsockopt(result, SOL_SOCKET, SO_RCVTIMEO, (char *)&value, size);
-        if (err == SOCKET_ERROR) {
-            wsa_print_err();
-            return INVALID_SOCKET;
-        }
+        err = sock.setTimeout(TIMEOUT, SO_RCVTIMEO);
+        if (_ERROR(err))
+            return err;
+        else if (WARNING(err))
+            LOG::colored(CC_WarningHL, "Cannot to set receive timeout");
     }
 
 	// Connect to server
-    err = connect(result, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
-	if (err == SOCKET_ERROR) {
-		err = WSAGetLastError();
-        switch (err) {
+    err = sock.connect(IP, port);
+	if (_ERROR(err)) {
+        switch (WSAGetLastError()) {
         case WSAETIMEDOUT:
             // Таймаут
             LOG::raw_colored(CC_WarningHL, "Unable to connect to the server: timeout");
@@ -158,10 +125,10 @@ SOCKET Client::connect2server(uint16_t port, IPPROTO protocol)
             // Критическая ошибка
             wsa_print_err();
         }
-		return INVALID_SOCKET;
+		return err;
 	}
 
-	return result;
+	return E_OK;
 }
 
 int Client::authorize(std::string_view login, std::string_view pass)
@@ -288,18 +255,16 @@ void Client::receiverThread()
 	// Сбрасываем соединение (сокет для чтения)
 	setState(ClientState::Shutdown);
 
-	if (dataSocket != INVALID_SOCKET)
-		if (shutdown(dataSocket, SD_RECEIVE) == SOCKET_ERROR)
-			wsa_print_err();
+    err = dataSocket.shutdown(SD_RECEIVE);
+	if (!SUCCESS(err))
+		wsa_print_err();
 
 	// Закрытие сокета (чтение)
 	setState(ClientState::CloseSocket);
 
-	if (dataSocket != INVALID_SOCKET)
-		if (closesocket(dataSocket) == SOCKET_ERROR)
-			wsa_print_err();
-
-	dataSocket = INVALID_SOCKET;
+    err = dataSocket.close();
+    if (!SUCCESS(err))
+        wsa_print_err();
 
 	// Завершаем поток
 	LOG::colored(CC_InfoHL, "Receiver thread closed");
@@ -340,19 +305,17 @@ void Client::senderThread()
 	// Сбрасываем соединение (сокет для записи)
 	setState(ClientState::Shutdown);
 
-	if (dataSocket != INVALID_SOCKET)
-		if (shutdown(dataSocket, SD_SEND) == SOCKET_ERROR)
-			wsa_print_err();
+    ERR err = dataSocket.shutdown(SD_SEND);
+    if (!SUCCESS(err))
+        wsa_print_err();
 
     // TODO: закрывать сокет нужно только после того, как сокет будет закрыт на чтение
 	// Закрытие сокета (запись)
 	setState(ClientState::CloseSocket);
 
-	if (dataSocket != INVALID_SOCKET)
-		if (closesocket(dataSocket) == SOCKET_ERROR)
-			wsa_print_err();
-
-	dataSocket = INVALID_SOCKET;
+    err = dataSocket.close();
+    if (!SUCCESS(err))
+        wsa_print_err();
 
 	// Завершаем поток
 	LOG::colored(CC_InfoHL, "Sender thread closed");
@@ -379,7 +342,7 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		// - после закрытия соединения,
 		// - после таймаута (см. closeAfterTimeout)
 
-		int respSize = recv(dataSocket, respBuff.data(), NET_BUFFER_SIZE, 0);
+		int respSize = recv(dataSocket.getSocket(), respBuff.data(), NET_BUFFER_SIZE, 0);
 		if      (respSize > 0) {
 			// Записываем данные от сервера
 			dest = PacketFactory::create(respBuff.data(), respSize);

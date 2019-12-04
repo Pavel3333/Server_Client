@@ -2,6 +2,7 @@
 #include <atomic>
 
 #include "Error.h"
+#include "Socket.h"
 
 
 class Packet;
@@ -29,8 +30,8 @@ public:
 		return header->fullsize - sizeof(packet_header);
 	}
 
-	int send(SOCKET s) {
-		return ::send(s, data(), static_cast<int>(size()), 0);
+	int send(Socket& sock) {
+		return ::send(sock.getSocket(), data(), static_cast<int>(size()), 0);
 	}
 
 private:

@@ -10,7 +10,15 @@ enum class ERROR_TYPE {
 enum ERR {
     E_OK = 0,
 
+    W_SET_TIMEOUT,
+    W_SHUTDOWN,
+    W_CLOSE_SOCKET,
+
     E_START_SERVER,
+
+    E_UNKNOWN_PROTOCOL,
+    E_CREATE_SOCKET,
+    E_CONNECT,
 
     E_UNKNOWN
 };

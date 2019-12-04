@@ -8,7 +8,7 @@
 
 enum class ClientState {
 	InitWinSock,
-	SetOpts,
+    SetOpts,
 	CreateAuthSocket,
 	Auth,
     CreateDataSocket,
@@ -32,7 +32,7 @@ public:
 
 	// Getters
 	bool isRunning() const {
-        return started && authSocket != INVALID_SOCKET; 
+        return started && authSocket.status == 2; 
     }
 
 	uint16_t getID() const { return ID; }
@@ -48,7 +48,7 @@ public:
 	std::queue<PacketPtr>  mainPackets;
 	std::vector<PacketPtr> syncPackets;
 private:
-    SOCKET connect2server(uint16_t port, IPPROTO protocol);
+    ERR connect2server(Socket& sock, uint16_t port, IPPROTO protocol);
 
     int authorize(std::string_view login, std::string_view pass);
 
@@ -84,6 +84,6 @@ private:
 
 	bool started;
 
-	SOCKET authSocket;
-	SOCKET dataSocket;
+	Socket authSocket;
+    Socket dataSocket;
 };

@@ -1,14 +1,13 @@
 #pragma once
 
-#include <string.h>
-
-#define min(a,b) (((a) > (b)) ? (a) : (b))
+#include <algorithm>
+#include <string>
 
 template <typename T, T max_len>
 struct PlanarString {
-    PlanarString (const char str[]) { // TODO: const char[] -> std::string_view
-      length = min(strlen(str), max_len);
-      memcpy(&string, str, length);
+    PlanarString (std::string_view str) {
+      length = std::min(str.length(), max_len);
+      memcpy(&string, str.data(), length);
     };
     T length;
     char string[max_len];
