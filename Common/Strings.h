@@ -1,7 +1,15 @@
 #pragma once
 
-template <class T>
+#include <string.h>
+
+#define min(a,b) (((a) > (b)) ? (a) : (b))
+
+template <typename T, T max_len>
 struct PlanarString {
-    T size;
-    char string[0]; // TODO: dynamic size
+    PlanarString (const char str[]) { // TODO: const char[] -> std::string_view
+      length = min(strlen(str), max_len);
+      memcpy(&string, str, length);
+    };
+    T length;
+    char string[max_len];
 };
