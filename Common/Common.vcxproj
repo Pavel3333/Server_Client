@@ -134,6 +134,8 @@
     <ClInclude Include="Error.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="Packet.h" />
+    <ClInclude Include="Socket.h" />
+    <ClInclude Include="Strings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Packet.cpp" />
