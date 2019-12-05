@@ -52,14 +52,15 @@ public:
         size = availableSize(size);
         if (!size) return nullptr;
 
-        return string_view(getData() + data_offset, size);
+        string_view data = string_view(getData() + data_offset, size);
+        data_offset += size;
+        return data;
     }
 
     void writeData(std::string_view data) {
         size_t size = availableSize(data.size());
 
         memcpy((char*)getData() + data_offset, data.data(), size);
-
         data_offset += size;
     }
 
