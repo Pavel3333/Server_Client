@@ -57,7 +57,14 @@ int start() {
 
 				std::getline(std::cin, cmd);
 
-				Client::getInstance().sendPacket(PacketFactory::create(cmd.data(), cmd.size(), false));
+				Client::getInstance().sendPacket(
+                    PacketFactory::create(
+                        DT_AUTH_CLIENT,
+                        cmd.data(),
+                        cmd.size(),
+                        false
+                    )
+                );
 			}
 			else if (cmd == "commands") { // Вывод всех доступных команд
 				Client::getInstance().printCommandsList();

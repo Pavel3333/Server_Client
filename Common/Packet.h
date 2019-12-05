@@ -1,9 +1,21 @@
 #pragma once
 #include <atomic>
+#include <algorithm>
 
 #include "Error.h"
 #include "Socket.h"
 
+
+enum DataType {
+    DT_EMPTY,
+
+    DT_AUTH_CLIENT,
+    DT_AUTH_SERVER,
+
+    DT_TEST,
+
+    DT_UNKNOWN
+};
 
 class Packet;
 typedef std::shared_ptr<Packet> PacketPtr;
@@ -11,8 +23,8 @@ typedef std::shared_ptr<Packet> PacketPtr;
 
 class Packet : public std::vector<char> {
 public:
-	Packet(uint32_t ID, std::string_view, bool needACK);
-	Packet(std::string_view);
+    Packet(uint32_t ID, DataType type, bool needACK, size_t data_size, const char* data = nullptr);
+	Packet(std::string_view data);
 
 	uint32_t getID() const {
 		return header->ID;
@@ -23,27 +35,65 @@ public:
 	}
 
 	const char* getData() const {
-		return this->data() + sizeof(packet_header);
+		return this->data() + sizeof(PacketHeader) + sizeof(DataHeader);
 	}
 
 	uint32_t getDataSize() const {
-		return header->fullsize - sizeof(packet_header);
+		return data_header->data_size;
 	}
+
+    DataType getDataType() const {
+        return data_header->type;
+    }
+
+    std::string_view readData(size_t size) {
+        using std::string_view;
+
+        size = availableSize(size);
+        if (!size) return nullptr;
+
+        return string_view(getData() + data_offset, size);
+    }
+
+    void writeData(std::string_view data) {
+        size_t size = availableSize(data.size());
+
+        memcpy((char*)getData() + data_offset, data.data(), size);
+
+        data_offset += size;
+    }
 
 	int send(Socket& sock) {
 		return ::send(sock.getSocket(), data(), static_cast<int>(size()), 0);
 	}
 
 private:
+    uint32_t data_offset;
+
+#ifdef min
+#undef min
+#endif
+    size_t availableSize(size_t size) {
+        if (data_offset >= data_header->data_size) return 0;
+        size_t available = std::min(data_header->data_size - data_offset, size);
+        return size;
+    }
+
 #pragma pack(push,1)
-	struct packet_header {
+	struct PacketHeader {
 		uint32_t fullsize;
 		uint32_t ID;
 		bool needACK;
 	} *header;
 
+    struct DataHeader {
+        DataType type;
+        uint32_t data_size;
+    } *data_header;
+
 	// check packing
-	static_assert(sizeof(packet_header) == 9);
+	static_assert(sizeof(PacketHeader) == 9);
+	static_assert(sizeof(DataHeader) == 8);
 #pragma pack(pop)
 };
 
@@ -56,11 +106,11 @@ std::ostream& operator<< (std::ostream& os, Packet& packet);
 // Packet Factory Singleton
 class PacketFactory {
 public:
-	static PacketPtr create(const char* data, size_t size, bool needACK) {
+	static PacketPtr create(DataType type, const char* data, size_t size, bool needACK) {
 		using std::make_shared;
 		using std::string_view;
 
-		return make_shared<Packet>(getID(), string_view(data, size), needACK);
+		return make_shared<Packet>(getID(), type, needACK, size, data);
 	}
 
 	static PacketPtr create(const char* data, size_t size) {
@@ -71,9 +121,13 @@ public:
 	}
 
 	template <class T> 
-	static PacketPtr create_from_struct(T &packet, bool needACK) {
+	static PacketPtr create_from_struct(DataType type, T &packet, bool needACK) {
 		return create(
-			reinterpret_cast<const char*>(&packet), sizeof(packet), needACK);
+            type,
+			reinterpret_cast<const char*>(&packet),
+            sizeof(packet),
+            needACK
+        );
 	}
 
 private:
@@ -92,32 +146,17 @@ private:
 // Auth packets
 
 #pragma pack(push,1)
-struct ServerAuthPacket {
-    SERVER_ERR errorCode;
-    uint8_t tokenSize : TOKEN_BITCNT;
-    char    token[TOKEN_MAX_SIZE];
-};
-
-struct ClientAuthPacket {
-    ClientAuthPacket() {
-		loginSize =  0;
-		passSize  =  0;
-	}
-
-    ClientAuthPacket(std::string_view login, std::string_view pass) {
-        loginSize = static_cast<uint8_t>(min(login.size(), LOGIN_MAX_SIZE));
-		passSize  = static_cast<uint8_t>(min(pass.size(),  PWD_MAX_SIZE));
-		memcpy(this->login,             login.data(), loginSize);
-		memcpy(this->login + loginSize, pass.data(),  passSize);
-	}
-
+struct ClientAuthHeader {
     uint8_t  loginSize : LOGIN_BITCNT;
     uint8_t  passSize  : PWD_BITCNT;
-	char     login[LOGIN_MAX_SIZE];
-    char     pass [PWD_MAX_SIZE];
+};
+
+struct ServerAuthHeader {
+    SERVER_ERR errorCode;
+    uint8_t tokenSize : TOKEN_BITCNT;
 };
 
 // check packing
-static_assert(sizeof(ServerAuthPacket) == 5 + TOKEN_MAX_SIZE);
-static_assert(sizeof(ClientAuthPacket) == 2 + LOGIN_MAX_SIZE + PWD_MAX_SIZE);
+static_assert(sizeof(ServerAuthHeader) == 5);
+static_assert(sizeof(ClientAuthHeader) == 2);
 #pragma pack(pop)

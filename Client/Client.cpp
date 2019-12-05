@@ -138,9 +138,15 @@ int Client::authorize(std::string_view login, std::string_view pass)
 	// Authorization
 	setState(ClientState::Auth);
 
-    ClientAuthPacket clientAuthRaw { login, pass };
+    ClientAuthHeader clientAuthHeader {
+        static_cast<uint8_t>(login.size()),
+        static_cast<uint8_t>(pass.size())
+    };
 
-    PacketPtr clientAuth = PacketFactory::create_from_struct(clientAuthRaw, true);
+    PacketPtr clientAuth = PacketFactory::create_from_struct(DT_AUTH_CLIENT, clientAuthHeader, true);
+    clientAuth->writeData(login);
+    clientAuth->writeData(pass);
+
     if (sendData(clientAuth))
         return 1;
 
@@ -155,24 +161,21 @@ int Client::authorize(std::string_view login, std::string_view pass)
 	if (!serverAuth)
 		// Empty packet
 		return 2;
-	else if (serverAuth->getDataSize() != sizeof(ServerAuthPacket))
+	else if (serverAuth->getDataSize() < sizeof(ServerAuthHeader))
 		// Packet size is incorrect
 		return 3;
 
-	auto serverAuthRaw = reinterpret_cast<const ServerAuthPacket*>(
+	auto serverAuthHeader = reinterpret_cast<const ServerAuthHeader*>(
         serverAuth->getData());
 
-    if (_ERROR(serverAuthRaw->errorCode)) {
-        LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthRaw->errorCode);
+    if (_ERROR(serverAuthHeader->errorCode)) {
+        LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthHeader->errorCode);
         return 4;
     }
-    else if (WARNING(serverAuthRaw->errorCode))
-        LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthRaw->errorCode);
+    else if (WARNING(serverAuthHeader->errorCode))
+        LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthHeader->errorCode);
 
-    if (serverAuthRaw->tokenSize >= TOKEN_MAX_SIZE)
-        return 5;
-
-    token = std::string_view(serverAuthRaw->token, serverAuthRaw->tokenSize);
+    std::string_view token = serverAuth->readData(serverAuthHeader->tokenSize);
 
 	LOG::colored(CC_SuccessHL, "Client authorized successfully! Client token: %.*s", token.size(), token.data());
 
