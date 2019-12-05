@@ -136,11 +136,11 @@
     <ClInclude Include="Log.h" />
     <ClInclude Include="Packet.h" />
     <ClInclude Include="Socket.h" />
-    <ClInclude Include="Strings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Packet.cpp" />
     <ClCompile Include="Log.cpp" />
+    <ClCompile Include="Socket.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
