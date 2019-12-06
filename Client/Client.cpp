@@ -27,25 +27,30 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
     // Create an authorization socket
     setState(ClientState::CreateAuthSocket);
 
-    err = connect2server(authSocket, authPort, IPPROTO_TCP);
+    err = initSocket(authSocket, authPort, IPPROTO_TCP);
     if (_ERROR(err))
         return 2;
+
+    err = connect2server(authSocket, authPort);
+    if (!SUCCESS(err))
+        return err;
 
     started = true;
 
     LOG::colored(CC_SuccessHL, "The client is authorizing on the %d port", authPort);
 
     err = authorize(login, pass);
-	if (err) return err;
+	if (_ERROR(err))
+        return err;
 
     // Create an authorization socket
     setState(ClientState::CreateDataSocket);
 
-    err = connect2server(dataSocket, dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
+    err = initSocket(dataSocket, dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
     if (_ERROR(err))
         return 3;
 
-    //createThreads();
+    createThreads();
 
 	return 0;
 }
@@ -88,7 +93,7 @@ void Client::printCommandsList() const
 }
 
 
-ERR Client::connect2server(Socket& sock, uint16_t port, IPPROTO protocol)
+ERR Client::initSocket(Socket& sock, uint16_t port, IPPROTO protocol)
 {
     ERR err = sock.init(IP, port, protocol);
     if (!SUCCESS(err))
@@ -113,22 +118,24 @@ ERR Client::connect2server(Socket& sock, uint16_t port, IPPROTO protocol)
             LOG::colored(CC_WarningHL, "Cannot to set receive timeout");
     }
 
-	// Connect to server
-    err = sock.connect(IP, port);
-	if (_ERROR(err)) {
-        switch (WSAGetLastError()) {
-        case WSAETIMEDOUT:
-            // Таймаут
-            LOG::raw_colored(CC_WarningHL, "Unable to connect to the server: timeout");
-            break;
-        default:
-            // Критическая ошибка
-            wsa_print_err();
-        }
-		return err;
-	}
-
 	return E_OK;
+}
+
+ERR Client::connect2server(Socket& sock, uint16_t port) {
+    
+    ERR err = sock.connect(IP, port);
+    if (_ERROR(err)) {
+        wsa_print_err();
+        return err;
+    }
+    else if (WARNING(err)) {
+        if (err == W_TIMEOUT)
+            LOG::raw_colored(CC_WarningHL, "Unable to connect to the server: timeout");
+        else
+            LOG::colored(CC_WarningHL, "Unable to connect to the server: warning code %d", err);
+    }
+
+    return err;
 }
 
 int Client::authorize(std::string_view login, std::string_view pass)
@@ -152,25 +159,25 @@ int Client::authorize(std::string_view login, std::string_view pass)
 
     PacketPtr serverAuth;
 	err = receiveData(serverAuth, false);
-	if (err > 0)
+	if (_ERROR(err))
 		// Критическая ошибка или соединение сброшено
-		return 1;
+		return 2;
 
 	// Packet handling
 
 	if (!serverAuth)
 		// Empty packet
-		return 2;
+		return 3;
 	else if (serverAuth->getDataSize() < sizeof(ServerAuthHeader))
 		// Packet size is incorrect
-		return 3;
+		return 4;
 
 	auto serverAuthHeader = reinterpret_cast<const ServerAuthHeader*>(
         serverAuth->getData());
 
     if (_ERROR(serverAuthHeader->errorCode)) {
         LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthHeader->errorCode);
-        return 4;
+        return 5;
     }
     else if (WARNING(serverAuthHeader->errorCode))
         LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthHeader->errorCode);
@@ -204,7 +211,7 @@ int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfte
 	PacketPtr packet;
 
 	int err = receiveData(packet, closeAfterTimeout);
-	if (err)
+	if (_ERROR(err))
 		return err; // Произошла ошибка
 
 	if (!packet) return -1;
@@ -225,7 +232,7 @@ int Client::handlePacketOut(PacketPtr packet)
 			true                                                                   // Таймаут 3 секунды
 		);
 
-		if (err)
+		if (_ERROR(err))
 			return 2;
 	}
 
@@ -249,10 +256,8 @@ void Client::receiverThread()
 			false
 		);
 
-		if (err) {
-			if (err > 0) break;    // Критическая ошибка или соединение сброшено
-			else         continue; // Неудачный пакет, продолжить прием        
-		}
+	    if      (_ERROR(err))  break;    // Критическая ошибка или соединение сброшено
+		else if (WARNING(err)) continue; // Неудачный пакет, продолжить прием        
 	}
 
 	// Сбрасываем соединение (сокет для чтения)

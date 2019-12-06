@@ -8,11 +8,13 @@ enum class ERROR_TYPE {
 };
 
 enum ERR {
-    E_OK = 0,
+    W_TIMEOUT = -4,
 
     W_SET_TIMEOUT,
     W_SHUTDOWN,
     W_CLOSE_SOCKET,
+
+    E_OK,
 
     E_START_SERVER,
 
@@ -22,6 +24,7 @@ enum ERR {
 
     E_UNKNOWN
 };
+static_assert(E_OK == 0);
 
 enum SERVER_ERR {
     SE_OK = 0,
@@ -30,6 +33,7 @@ enum SERVER_ERR {
 
     SE_UNKNOWN
 };
+static_assert(SE_OK == 0);
 
 #define SUCCESS(err) (err == 0)
 #define WARNING(err) (err <  0)

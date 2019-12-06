@@ -12,7 +12,7 @@ enum DataType {
     DT_AUTH_CLIENT,
     DT_AUTH_SERVER,
 
-    DT_TEST,
+    DT_MSG,
 
     DT_UNKNOWN
 };

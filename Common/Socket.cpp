@@ -48,8 +48,17 @@ ERR Socket::connect(PCSTR IP, uint16_t port) {
     inet_pton(AF_INET, IP, &(serverAddr.sin_addr.s_addr));
 
     int err = ::connect(socket, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
-    if (err == SOCKET_ERROR)
+    if (err == SOCKET_ERROR) {
+        switch (WSAGetLastError()) {
+        case WSAETIMEDOUT:
+            // Таймаут
+            return W_TIMEOUT;
+        default:
+            // Критическая ошибка
+            return E_CONNECT;
+        }
         return E_CONNECT;
+    }
 
     return E_OK;
 }

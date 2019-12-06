@@ -147,7 +147,7 @@ int ConnectedClient::handlePacketIn(std::function<int(PacketPtr)> handler, bool 
 	PacketPtr packet;
 
 	int err = receiveData(packet, closeAfterTimeout);
-	if (err)
+	if (_ERROR(err))
 		return err; // Произошла ошибка
 
 	if (!packet) return -1;
@@ -193,8 +193,8 @@ void ConnectedClient::receiverThread()
 		);
 
 		if (err) {
-			if (err > 0) break;    // Критическая ошибка или соединение сброшено
-			else         continue; // Неудачный пакет, продолжить прием        
+			if (_ERROR(err)) break; // Критическая ошибка или соединение сброшено
+			else         continue;  // Неудачный пакет, продолжить прием        
 		}
 	}
 

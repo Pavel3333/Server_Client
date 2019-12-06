@@ -222,7 +222,7 @@ void Server::send(ConnectedClientPtr client, PacketPtr packet)
 		std::string cmd;
 		std::getline(std::cin, cmd);
 
-		packet = PacketFactory::create(DT_TEST, cmd.data(), cmd.size(), false);
+		packet = PacketFactory::create(DT_MSG, cmd.data(), cmd.size(), false);
 	}
 
 	client->sendPacket(packet);
@@ -241,7 +241,7 @@ void Server::sendAll(PacketPtr packet)
 		std::string cmd;
 		std::getline(std::cin, cmd);
 
-		packet = PacketFactory::create(DT_TEST, cmd.data(), cmd.size(), false);
+		packet = PacketFactory::create(DT_MSG, cmd.data(), cmd.size(), false);
 	}
 
 	size_t count = processClientsByPair(

@@ -48,7 +48,8 @@ public:
 	std::queue<PacketPtr>  mainPackets;
 	std::vector<PacketPtr> syncPackets;
 private:
-    ERR connect2server(Socket& sock, uint16_t port, IPPROTO protocol);
+    ERR initSocket(Socket& sock, uint16_t port, IPPROTO protocol);
+    ERR connect2server(Socket& sock, uint16_t port);
 
     int authorize(std::string_view login, std::string_view pass);
 
