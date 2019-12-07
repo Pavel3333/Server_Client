@@ -2,9 +2,9 @@
 #include <array>
 #include "Client.h"
 
-int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort)
+ERR Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort)
 {
-    int err;
+    ERR err;
 
 	// Init class members
 	this->authPort = authPort;
@@ -18,10 +18,10 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
 
 	WSADATA wsaData;
 
-	err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (err != NO_ERROR) {
+	int init_winsock = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (init_winsock != NO_ERROR) {
 		wsa_print_err();
-		return 1;
+		return E_INIT_WINSOCK;
 	}
 
     // Create an authorization socket
@@ -29,7 +29,7 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
 
     err = initSocket(authSocket, authPort, IPPROTO_TCP);
     if (_ERROR(err))
-        return 2;
+        return err;
 
     err = connect2server(authSocket, authPort);
     if (!SUCCESS(err))
@@ -48,11 +48,11 @@ int Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
 
     err = initSocket(dataSocket, dataPort, IPPROTO_TCP); // TODO: make UDP in the ClientUDP
     if (_ERROR(err))
-        return 3;
+        return err;
 
     createThreads();
 
-	return 0;
+	return E_OK;
 }
 
 void Client::disconnect()
@@ -69,6 +69,12 @@ void Client::disconnect()
 
 	if (sender.joinable())
 		sender.join();
+
+    // Closing sockets
+    setState(ClientState::CloseSocket);
+
+    dataSocket.close();
+    authSocket.close();
 
 	// Clear all data
 
@@ -191,52 +197,53 @@ ERR Client::authorize(std::string_view login, std::string_view pass)
 
 
 // Обработать пакет ACK
-int Client::ack_handler(PacketPtr packet)
+ERR Client::ack_handler(PacketPtr packet)
 {
 	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
-	return 0;
+	return E_OK;
 }
 
 // Обработать любой входящий пакет
-int Client::any_packet_handler(PacketPtr packet)
+ERR Client::any_packet_handler(PacketPtr packet)
 {
 	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
-	return 0;
+	return E_OK;
 }
 
 
 // Обработка входящего пакета
-int Client::handlePacketIn(std::function<int(PacketPtr)> handler, bool closeAfterTimeout)
+ERR Client::handlePacketIn(std::function<ERR(PacketPtr)> handler, bool closeAfterTimeout)
 {
 	PacketPtr packet;
 
-	int err = receiveData(packet, closeAfterTimeout);
+	ERR err = receiveData(packet, closeAfterTimeout);
 	if (_ERROR(err))
 		return err; // Произошла ошибка
 
-	if (!packet) return -1;
+	if (!packet)
+        return W_HAMDLE_IN_PACKET_EMPTY;
 
 	// Обработка пришедшего пакета
 	return handler(packet);
 }
 
 // Обработка исходящего пакета
-int Client::handlePacketOut(PacketPtr packet)
+ERR Client::handlePacketOut(PacketPtr packet)
 {
 	if (sendData(packet))
-		return 1;
+		return E_HANDLE_OUT_SEND;
 
 	if (packet->isNeedACK()) {                                                     // Если нужно подтверждение отправленного пакета
-		int err = handlePacketIn(                                                  // Попробовать принять подтверждение
+		ERR err = handlePacketIn(                                                  // Попробовать принять подтверждение
 			std::bind(&Client::ack_handler, this, std::placeholders::_1),
 			true                                                                   // Таймаут 3 секунды
 		);
 
 		if (_ERROR(err))
-			return 2;
+			return err;
 	}
 
-	return 0;
+	return E_OK;
 }
 
 
@@ -246,7 +253,7 @@ void Client::receiverThread()
 	// Задать имя потоку
 	setThreadDesc(L"[Receiver]");
 
-	int err = 0;
+	ERR err = E_OK;
 
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
@@ -260,19 +267,15 @@ void Client::receiverThread()
 		else if (WARNING(err)) continue; // Неудачный пакет, продолжить прием        
 	}
 
+    if (!_ERROR(err))
+        wsa_print_err();
+
 	// Сбрасываем соединение (сокет для чтения)
 	setState(ClientState::Shutdown);
 
     err = dataSocket.shutdown(SD_RECEIVE);
 	if (!SUCCESS(err))
 		wsa_print_err();
-
-	// Закрытие сокета (чтение)
-	setState(ClientState::CloseSocket);
-
-    err = dataSocket.close();
-    if (!SUCCESS(err))
-        wsa_print_err();
 
 	// Завершаем поток
 	LOG::colored(CC_InfoHL, "Receiver thread closed");
@@ -317,14 +320,6 @@ void Client::senderThread()
     if (!SUCCESS(err))
         wsa_print_err();
 
-    // TODO: закрывать сокет нужно только после того, как сокет будет закрыт на чтение
-	// Закрытие сокета (запись)
-	setState(ClientState::CloseSocket);
-
-    err = dataSocket.close();
-    if (!SUCCESS(err))
-        wsa_print_err();
-
 	// Завершаем поток
 	LOG::colored(CC_InfoHL, "Sender thread closed");
 }
@@ -338,7 +333,7 @@ void Client::createThreads()
 
 
 // Принятие данных
-int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
+ERR Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 {
 	setState(ClientState::Receive);
 
@@ -363,52 +358,47 @@ int Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 		else if (!respSize) {
 			// Соединение сброшено
 			LOG::raw_colored(CC_InfoHL, "Connection closed");
-			return 1;
+			return E_CONN_CLOSED;
 		}
-		else {
-			int err = WSAGetLastError();
-
-			if      (err == WSAETIMEDOUT) {
-				// Таймаут
-				if (closeAfterTimeout) return -1;
-				else                   continue;
-			}
-			else if (err == WSAEMSGSIZE) {
-				// Размер пакета превысил размер буфера
-				// Вывести предупреждение
-				LOG::raw_colored(CC_WarningHL, "The size of received packet is larger than the buffer size!");
-				return -2;
-			}
-			else if (err == WSAECONNRESET || err == WSAECONNABORTED) {
-				// Соединение сброшено
-				LOG::raw_colored(CC_InfoHL, "Connection closed");
-				return 2;
-			}
-			else {
-				// Критическая ошибка
-				wsa_print_err();
-				return 3;
-			}
+		else switch(WSAGetLastError()) {
+        case WSAETIMEDOUT:
+            // Таймаут
+            if (closeAfterTimeout) return W_TIMEOUT;
+            else                   continue;
+        case WSAEMSGSIZE:
+            // Размер пакета превысил размер буфера
+            // Вывести предупреждение
+            LOG::raw_colored(CC_WarningHL, "The size of received packet is larger than the buffer size!");
+            return W_MSG_SIZE;
+        case WSAECONNRESET:
+        case WSAECONNABORTED:
+            // Соединение сброшено
+            LOG::raw_colored(CC_InfoHL, "Connection closed");
+            return E_CONN_CLOSED;
+        default:
+            // Критическая ошибка
+            wsa_print_err();
+            return E_RECV;
 		}
 	}
 
-	return 0;
+	return E_OK;
 }
 
 // Отправка данных
-int Client::sendData(PacketPtr packet)
+ERR Client::sendData(PacketPtr packet)
 {
 	setState(ClientState::Send);
 
 	if (packet->send(dataSocket) == SOCKET_ERROR) {
 		wsa_print_err();
-		return 1;
+		return E_SEND;
 	}
 
 	// Добавить пакет
 	sendedPackets.push_back(packet);
 
-	return 0;
+	return E_OK;
 }
 
 

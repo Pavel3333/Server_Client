@@ -7,7 +7,10 @@ constexpr uint16_t DATA_PORT = 27011;
 
 ERR start()
 {
-	if (Server::getInstance().startServer(AUTH_PORT) > 0) // Произошла ошибка
+    int err;
+
+    err = Server::getInstance().startServer(AUTH_PORT);
+	if (_ERROR(err))
 		return ERR::E_START_SERVER;
 
 	Server::getInstance().printCommandsList();

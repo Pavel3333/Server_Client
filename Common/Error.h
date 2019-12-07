@@ -8,15 +8,21 @@ enum class ERROR_TYPE {
 };
 
 enum ERR {
-    W_TIMEOUT = -4,
+    W_HAMDLE_IN_PACKET_EMPTY,
+    
+    W_TIMEOUT = -5,
 
     W_SET_TIMEOUT,
     W_SHUTDOWN,
     W_CLOSE_SOCKET,
 
+    W_MSG_SIZE,
+
     E_OK,
 
     E_START_SERVER,
+
+    E_INIT_WINSOCK,
 
     E_UNKNOWN_PROTOCOL,
     E_CREATE_SOCKET,
@@ -28,6 +34,13 @@ enum ERR {
     E_AUTH_SERVER_EMPTY,
     E_AUTH_SERVER_SIZE,
     E_AUTH_SERVER_GOTERR,
+
+    E_HANDLE_OUT_SEND,
+
+    E_SEND,
+    E_RECV,
+
+    E_CONN_CLOSED,
 
     E_UNKNOWN
 };
