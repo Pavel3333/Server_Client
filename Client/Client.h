@@ -32,7 +32,7 @@ public:
 
 	// Getters
 	bool isRunning() const {
-        return started && authSocket.status == 2; 
+        return started && authSocket.status == 2 && dataSocket == 2; 
     }
 
 	uint16_t getID() const { return ID; }
@@ -51,7 +51,7 @@ private:
     ERR initSocket(Socket& sock, uint16_t port, IPPROTO protocol);
     ERR connect2server(Socket& sock, uint16_t port);
 
-    int authorize(std::string_view login, std::string_view pass);
+    ERR authorize(std::string_view login, std::string_view pass);
 
 	int ack_handler(PacketPtr packet);
 	int any_packet_handler(PacketPtr packet);

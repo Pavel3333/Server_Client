@@ -22,6 +22,13 @@ enum ERR {
     E_CREATE_SOCKET,
     E_CONNECT,
 
+    E_AUTH_CLIENT_SEND,
+
+    E_AUTH_SERVER_RECV,
+    E_AUTH_SERVER_EMPTY,
+    E_AUTH_SERVER_SIZE,
+    E_AUTH_SERVER_GOTERR,
+
     E_UNKNOWN
 };
 static_assert(E_OK == 0);

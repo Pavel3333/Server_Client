@@ -57,7 +57,6 @@ ERR Socket::connect(PCSTR IP, uint16_t port) {
             // Критическая ошибка
             return E_CONNECT;
         }
-        return E_CONNECT;
     }
 
     return E_OK;

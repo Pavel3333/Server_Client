@@ -138,7 +138,7 @@ ERR Client::connect2server(Socket& sock, uint16_t port) {
     return err;
 }
 
-int Client::authorize(std::string_view login, std::string_view pass)
+ERR Client::authorize(std::string_view login, std::string_view pass)
 {
     int err;
 
@@ -155,29 +155,29 @@ int Client::authorize(std::string_view login, std::string_view pass)
     clientAuth->writeData(pass);
 
     if (sendData(clientAuth))
-        return 1;
+        return E_AUTH_CLIENT_SEND;
 
     PacketPtr serverAuth;
 	err = receiveData(serverAuth, false);
 	if (_ERROR(err))
 		// Критическая ошибка или соединение сброшено
-		return 2;
+		return E_AUTH_SERVER_RECV;
 
 	// Packet handling
 
 	if (!serverAuth)
 		// Empty packet
-		return 3;
+		return E_AUTH_SERVER_EMPTY;
 	else if (serverAuth->getDataSize() < sizeof(ServerAuthHeader))
 		// Packet size is incorrect
-		return 4;
+		return E_AUTH_SERVER_SIZE;
 
 	auto serverAuthHeader = reinterpret_cast<const ServerAuthHeader*>(
         serverAuth->getData());
 
     if (_ERROR(serverAuthHeader->errorCode)) {
         LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthHeader->errorCode);
-        return 5;
+        return E_AUTH_SERVER_GOTERR;
     }
     else if (WARNING(serverAuthHeader->errorCode))
         LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthHeader->errorCode);
@@ -186,7 +186,7 @@ int Client::authorize(std::string_view login, std::string_view pass)
 
 	LOG::colored(CC_SuccessHL, "Client authorized successfully! Client token: %.*s", token.size(), token.data());
 
-	return 0;
+	return E_OK;
 }
 
 
