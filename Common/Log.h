@@ -5,18 +5,17 @@
 
 extern std::mutex msg_mutex;
 
-
 enum ConsoleColor {
-// Dark colors
-	CC_Success = FOREGROUND_GREEN,
-	CC_Info    = FOREGROUND_GREEN | FOREGROUND_BLUE,
-	CC_Danger  = FOREGROUND_RED,
-	CC_Warning = FOREGROUND_RED | FOREGROUND_GREEN,
-	CC_Default = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE,
-// Rich colors
+    // Dark colors
+    CC_Success = FOREGROUND_GREEN,
+    CC_Info = FOREGROUND_GREEN | FOREGROUND_BLUE,
+    CC_Danger = FOREGROUND_RED,
+    CC_Warning = FOREGROUND_RED | FOREGROUND_GREEN,
+    CC_Default = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE,
+    // Rich colors
     CC_SuccessHL = FOREGROUND_INTENSITY | CC_Success,
-    CC_InfoHL    = FOREGROUND_INTENSITY | CC_Info,
-    CC_DangerHL  = FOREGROUND_INTENSITY | CC_Danger,
+    CC_InfoHL = FOREGROUND_INTENSITY | CC_Info,
+    CC_DangerHL = FOREGROUND_INTENSITY | CC_Danger,
     CC_WarningHL = FOREGROUND_INTENSITY | CC_Warning,
     CC_DefaultHL = FOREGROUND_INTENSITY | CC_Default
 };
@@ -43,8 +42,6 @@ public:
     static void log(const char* fmt, ...);
 };
 
-
-
 // Print WSA errors
 const char* __get_filename(const char* file);
 
@@ -53,8 +50,6 @@ const char* __get_filename(const char* file);
 void __wsa_print_err(const char* file, int line);
 
 #define wsa_print_err() __wsa_print_err(__FILENAME__, __LINE__)
-
-
 
 // Set description to current thread
 void setThreadDesc(const wchar_t* desc);

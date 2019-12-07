@@ -1,8 +1,8 @@
 #pragma once
 #include <iostream>
+#include <mutex>
 #include <string_view>
 #include <thread>
-#include <mutex>
 
 #include "Constraints.h"
 #include "Error.h"
