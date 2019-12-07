@@ -196,23 +196,8 @@ ERR Client::authorize(std::string_view login, std::string_view pass)
 }
 
 
-// Обработать пакет ACK
-ERR Client::ack_handler(PacketPtr packet)
-{
-	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
-	return E_OK;
-}
-
-// Обработать любой входящий пакет
-ERR Client::any_packet_handler(PacketPtr packet)
-{
-	LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
-	return E_OK;
-}
-
-
 // Обработка входящего пакета
-ERR Client::handlePacketIn(std::function<ERR(PacketPtr)> handler, bool closeAfterTimeout)
+ERR Client::handlePacketIn(bool closeAfterTimeout)
 {
 	PacketPtr packet;
 
@@ -224,20 +209,18 @@ ERR Client::handlePacketIn(std::function<ERR(PacketPtr)> handler, bool closeAfte
         return W_HAMDLE_IN_PACKET_EMPTY;
 
 	// Обработка пришедшего пакета
-	return handler(packet);
+    return Handler::handle_packet(packet);
 }
 
 // Обработка исходящего пакета
 ERR Client::handlePacketOut(PacketPtr packet)
 {
-	if (sendData(packet))
+    ERR err = sendData(packet);
+	if (_ERROR(err))
 		return E_HANDLE_OUT_SEND;
 
-	if (packet->isNeedACK()) {                                                     // Если нужно подтверждение отправленного пакета
-		ERR err = handlePacketIn(                                                  // Попробовать принять подтверждение
-			std::bind(&Client::ack_handler, this, std::placeholders::_1),
-			true                                                                   // Таймаут 3 секунды
-		);
+	if (packet->isNeedACK()) {                                                 // Если нужно подтверждение отправленного пакета
+        err = handlePacketIn(true);                                            // Попробовать принять подтверждение
 
 		if (_ERROR(err))
 			return err;
@@ -258,10 +241,7 @@ void Client::receiverThread()
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
 	while (isRunning()) {
-		err = handlePacketIn(
-			std::bind(&Client::any_packet_handler, this, std::placeholders::_1),
-			false
-		);
+		err = handlePacketIn(false);
 
 	    if      (_ERROR(err))  break;    // Критическая ошибка или соединение сброшено
 		else if (WARNING(err)) continue; // Неудачный пакет, продолжить прием        

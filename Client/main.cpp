@@ -7,7 +7,8 @@ constexpr uint16_t    AUTH_PORT  = 27010;
 constexpr uint16_t    DATA_PORT  = 27011;
 constexpr const char* SERVER_IP  = "192.168.0.12";
 
-int start() {
+ERR start()
+{
     std::string login, pass;
 
     while (true) {
@@ -59,7 +60,7 @@ int start() {
 
 				Client::getInstance().sendPacket(
                     PacketFactory::create(
-                        DT_AUTH_CLIENT,
+                        DT_MSG,
                         cmd.data(),
                         cmd.size(),
                         false
@@ -71,7 +72,7 @@ int start() {
 			}
 			else if (cmd == "close") { // Закрытие клиента
 				Client::getInstance().disconnect();
-				return 0;
+				return E_OK;
 			}
 		}
 
@@ -85,18 +86,18 @@ int start() {
 	if (ctr_reconnect > 5)
 		LOG::raw_colored(CC_DangerHL, "Too many connection attempts. Contact the developers");
 
-	return 0;
+	return E_OK;
 }
 
 int main()
 {
-    int err;
+    ERR err;
 
 	// Задать имя потоку
 	setThreadDesc(L"[main]");
 
     err = start();
-	if (err)
+	if (_ERROR(err))
 		LOG::colored(CC_DangerHL, "Client creating failed - error: %d", err);
 
 	LOG::raw_colored(CC_InfoHL, "Press any button to end execution of client");

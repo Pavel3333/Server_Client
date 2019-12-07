@@ -2,8 +2,9 @@
 #include <vector>
 #include <queue>
 #include <thread>
-#include <functional>
+
 #include "Common.h"
+#include "Handler.h"
 
 
 enum class ClientState {
@@ -53,10 +54,7 @@ private:
 
     ERR authorize(std::string_view login, std::string_view pass);
 
-	ERR ack_handler(PacketPtr packet);
-	ERR any_packet_handler(PacketPtr packet);
-
-	ERR handlePacketIn(std::function<ERR(PacketPtr)>handler, bool closeAfterTimeout);
+	ERR handlePacketIn(bool closeAfterTimeout);
 	ERR handlePacketOut(PacketPtr packet);
 
 	void receiverThread();

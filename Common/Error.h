@@ -11,7 +11,6 @@ enum ERR {
     W_HAMDLE_IN_PACKET_EMPTY,
     
     W_TIMEOUT = -5,
-
     W_SET_TIMEOUT,
     W_SHUTDOWN,
     W_CLOSE_SOCKET,
@@ -24,7 +23,6 @@ enum ERR {
 
     E_INIT_WINSOCK,
 
-    E_UNKNOWN_PROTOCOL,
     E_CREATE_SOCKET,
     E_CONNECT,
 
@@ -41,6 +39,9 @@ enum ERR {
     E_RECV,
 
     E_CONN_CLOSED,
+
+    E_UNKNOWN_PROTOCOL,
+    E_UNKNOWN_DATATYPE,
 
     E_UNKNOWN
 };
