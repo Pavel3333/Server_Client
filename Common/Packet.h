@@ -159,7 +159,7 @@ private:
 #pragma pack(push, 1)
 struct ClientAuthHeader {
     uint8_t loginSize : LOGIN_BITCNT;
-    uint8_t passSize  : PWD_BITCNT;
+    uint8_t passSize : PWD_BITCNT;
 };
 
 struct ServerAuthHeader {

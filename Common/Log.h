@@ -5,6 +5,7 @@
 
 extern std::mutex msg_mutex;
 
+
 enum ConsoleColor {
     // Dark colors
     CC_Success = FOREGROUND_GREEN,

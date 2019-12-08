@@ -1,10 +1,10 @@
 #pragma once
 
 enum class ERROR_TYPE {
-    OK = 0, // Без ошибок
-    WARNING, // Предупреждение
-    SOFT_ERROR, // Ошибка
-    CRITICAL_ERROR // Критическая ошибка
+    OK = 0, // Р‘РµР· РѕС€РёР±РѕРє
+    WARNING, // РџСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ
+    SOFT_ERROR, // РћС€РёР±РєР°
+    CRITICAL_ERROR // РљСЂРёС‚РёС‡РµСЃРєР°СЏ РѕС€РёР±РєР°
 };
 
 enum ERR {
@@ -12,7 +12,7 @@ enum ERR {
 
     W_NEED_ACK,
 
-    W_TIMEOUT ,
+    W_TIMEOUT,
     W_SET_TIMEOUT,
     W_SHUTDOWN,
     W_CLOSE_SOCKET,

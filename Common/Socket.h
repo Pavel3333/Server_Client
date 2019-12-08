@@ -1,10 +1,13 @@
 #pragma once
 #include <atomic>
+#include <string_view>
 
+// FIXME: This should be private
 #include <Ws2tcpip.h>
 #include <winsock2.h>
 
 #include "Error.h"
+
 
 class Socket {
 private:
@@ -25,9 +28,8 @@ public:
 
     SOCKET getSocket() const { return socket; };
     ERR setTimeout(uint32_t timeout, int option);
-    // PCSTR??????
-    ERR init(PCSTR ip_str, uint16_t port, IPPROTO protocol);
-    ERR connect(PCSTR ip_str, uint16_t port);
+    ERR init(std::string_view ip_str, uint16_t port, IPPROTO protocol);
+    ERR connect(std::string_view ip_str, uint16_t port);
     ERR shutdown(int how);
     ERR close();
 

@@ -5,6 +5,7 @@ using std::endl;
 
 std::mutex msg_mutex;
 
+
 static void printThreadDesc()
 {
     wchar_t* desc;

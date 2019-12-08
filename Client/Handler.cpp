@@ -1,10 +1,10 @@
 #include "pch.h"
+#include <string_view>
 #include "Handler.h"
 #include "Client.h"
 
-#include <string_view>
 
-// Îáðàáîòàòü ëþáîé âõîäÿùèé ïàêåò
+// Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ Ð»ÑŽÐ±Ð¾Ð¹ Ð²Ñ…Ð¾Ð´ÑÑ‰Ð¸Ð¹ Ð¿Ð°ÐºÐµÑ‚
 ERR Handler::handle_packet(PacketPtr packet)
 {
     ERR err = E_OK;
@@ -36,33 +36,35 @@ ERR Handler::handle_packet(PacketPtr packet)
     return err;
 }
 
-// Îáðàáîòàòü ïàêåò ACK
+// Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ ack-Ð¿Ð°ÐºÐµÑ‚
 ERR Handler::handle_ack(PacketPtr packet)
 {
-    if (packet->getDataType() != DT_ACK)
+    if (packet->getDataType() != DT_ACK) {
         return E_UNKNOWN;
-    else if (packet->getDataSize() < sizeof(ServerACK))
+    } else if (packet->getDataSize() < sizeof(ServerACK)) {
         // Packet size is incorrect
         return E_SERVER_ACK_SIZE;
-    
+    }
+
     auto serverACKHeader = reinterpret_cast<const ServerACK*>(
         packet->getData());
 
     uint32_t ackedID = serverACKHeader->acknowledgedID;
 
     auto begin = Client::getInstance().syncPackets.cbegin();
-    auto end   = Client::getInstance().syncPackets.cend();
+    auto end = Client::getInstance().syncPackets.cend();
 
+    // FIXME: Make method in client for this
     auto acked_packet = std::find_if(
         begin,
         end,
-        [ackedID](PacketPtr syncPacket) -> bool
-        { return syncPacket->getID() == ackedID; }
-    );
+        [ackedID](PacketPtr syncPacket) -> bool { return syncPacket->getID() == ackedID; });
 
-    if (acked_packet == end)
+    if (acked_packet == end) {
         return E_ACKING_PACKET_NOT_FOUND;
+    }
 
+    // FIXME: Make method in client for this
     Client::getInstance().syncPackets.erase(acked_packet);
 
     return E_OK;

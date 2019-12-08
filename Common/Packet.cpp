@@ -1,5 +1,6 @@
 #include "Common.h"
 
+
 Packet::Packet(uint32_t ID, DataType type, bool needACK, size_t data_size, const char* data)
     : std::vector<char>()
     , data_offset(0)
