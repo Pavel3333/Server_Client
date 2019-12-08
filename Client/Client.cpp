@@ -188,7 +188,7 @@ ERR Client::authorize(std::string_view login, std::string_view pass)
     else if (WARNING(serverAuthHeader->errorCode))
         LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthHeader->errorCode);
 
-    std::string_view token = serverAuth->readData(serverAuthHeader->tokenSize);
+    token = serverAuth->readData(serverAuthHeader->tokenSize);
 
 	LOG::colored(CC_SuccessHL, "Client authorized successfully! Client token: %.*s", token.size(), token.data());
 
@@ -206,7 +206,7 @@ ERR Client::handlePacketIn(bool closeAfterTimeout)
 		return err; // Произошла ошибка
 
 	if (!packet)
-        return W_HAMDLE_IN_PACKET_EMPTY;
+        return W_HANDLE_IN_PACKET_EMPTY;
 
 	// Обработка пришедшего пакета
     return Handler::handle_packet(packet);
@@ -219,12 +219,8 @@ ERR Client::handlePacketOut(PacketPtr packet)
 	if (_ERROR(err))
 		return E_HANDLE_OUT_SEND;
 
-	if (packet->isNeedACK()) {                                                 // Если нужно подтверждение отправленного пакета
-        err = handlePacketIn(true);                                            // Попробовать принять подтверждение
-
-		if (_ERROR(err))
-			return err;
-	}
+    if (packet->isNeedACK())
+        return W_NEED_ACK;
 
 	return E_OK;
 }
@@ -264,6 +260,8 @@ void Client::receiverThread()
 // Поток отправки пакетов
 void Client::senderThread()
 {
+    ERR err;
+
 	// Задать имя потоку
 	setThreadDesc(L"[Sender]");
 
@@ -272,10 +270,9 @@ void Client::senderThread()
 		while (!mainPackets.empty()) {
 			PacketPtr packet = mainPackets.back();
 
-			if (handlePacketOut(packet)) {
-				LOG::colored(CC_Warning, "Packet %d not confirmed, adding to sync queue", packet->getID());
-				syncPackets.push_back(packet);
-			}
+            err = handlePacketOut(packet);
+            if (!SUCCESS(err))
+                syncPackets.push_back(packet);
 
 			mainPackets.pop();
 		}
@@ -283,11 +280,11 @@ void Client::senderThread()
 		// Обработать пакеты, не подтвержденные сервером
 		auto packetIt = syncPackets.begin();
 		while (packetIt != syncPackets.end()) {
-			if (handlePacketOut(*packetIt)) {
-				LOG::colored(CC_Warning, "Sync packet %d not confirmed", (*packetIt)->getID());
-				packetIt++;
-			}
-			else packetIt = syncPackets.erase(packetIt);
+            err = handlePacketOut(*packetIt);
+            if (!SUCCESS(err))
+                packetIt++;
+			else
+                packetIt = syncPackets.erase(packetIt);
 		}
 
 		Sleep(100);
@@ -296,7 +293,7 @@ void Client::senderThread()
 	// Сбрасываем соединение (сокет для записи)
 	setState(ClientState::Shutdown);
 
-    ERR err = dataSocket.shutdown(SD_SEND);
+    err = dataSocket.shutdown(SD_SEND);
     if (!SUCCESS(err))
         wsa_print_err();
 
@@ -333,7 +330,10 @@ ERR Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			// Добавить пакет
 			receivedPackets.push_back(dest);
 
-			break;
+            if (dest->getDataSize() != respSize)
+                return E_RECV_SIZE;
+
+            break;
 		}
 		else if (!respSize) {
 			// Соединение сброшено

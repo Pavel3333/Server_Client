@@ -7,6 +7,7 @@
 
 enum DataType {
     DT_EMPTY,
+    DT_ACK,
 
     DT_AUTH_CLIENT,
     DT_AUTH_SERVER,
@@ -158,7 +159,7 @@ private:
 #pragma pack(push, 1)
 struct ClientAuthHeader {
     uint8_t loginSize : LOGIN_BITCNT;
-    uint8_t passSize : PWD_BITCNT;
+    uint8_t passSize  : PWD_BITCNT;
 };
 
 struct ServerAuthHeader {
@@ -169,4 +170,23 @@ struct ServerAuthHeader {
 // check packing
 static_assert(sizeof(ServerAuthHeader) == 5);
 static_assert(sizeof(ClientAuthHeader) == 2);
+#pragma pack(pop)
+
+// ACK packet
+
+#pragma pack(push, 1)
+struct ClientACK {
+    ERR errorCode;
+    uint8_t tokenSize : TOKEN_BITCNT;
+    uint32_t acknowledgedID;
+};
+
+struct ServerACK {
+    SERVER_ERR errorCode;
+    uint32_t acknowledgedID;
+};
+
+// check packing
+static_assert(sizeof(ClientACK) == 9);
+static_assert(sizeof(ServerACK) == 8);
 #pragma pack(pop)
