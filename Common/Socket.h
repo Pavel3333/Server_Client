@@ -24,12 +24,12 @@ public:
     }
 
     SOCKET getSocket() const { return socket; };
-    ERR setTimeout(uint32_t timeout, int option);
+    ClientError setTimeout(uint32_t timeout, int option);
     // PCSTR??????
-    ERR init(PCSTR ip_str, uint16_t port, IPPROTO protocol);
-    ERR connect(PCSTR ip_str, uint16_t port);
-    ERR shutdown(int how);
-    ERR close();
+    ClientError init(PCSTR ip_str, uint16_t port, IPPROTO protocol);
+    ClientError connect(PCSTR ip_str, uint16_t port);
+    ClientError shutdown(int how);
+    ClientError close();
 
     // this is wrong!
     std::atomic_uint8_t status; // Count of opened streams (read/write) of the socket

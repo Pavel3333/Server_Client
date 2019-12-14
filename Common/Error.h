@@ -1,62 +1,68 @@
 #pragma once
 
 enum class ERROR_TYPE {
-    OK = 0, // Без ошибок
-    WARNING, // Предупреждение
-    SOFT_ERROR, // Ошибка
+    OK = 0,        // Без ошибок
+    WARNING,       // Предупреждение
+    SOFT_ERROR,    // Ошибка
     CRITICAL_ERROR // Критическая ошибка
 };
 
-enum ERR {
-    W_HANDLE_IN_PACKET_EMPTY = -7,
+enum ClientError {
+    CW_HANDLE_IN_PACKET_EMPTY = -7,
 
-    W_NEED_ACK,
+    CW_NEED_ACK,
 
-    W_TIMEOUT ,
-    W_SET_TIMEOUT,
-    W_SHUTDOWN,
-    W_CLOSE_SOCKET,
+    CW_TIMEOUT ,
+    CW_SET_TIMEOUT,
+    CW_SHUTDOWN,
+    CW_CLOSE_SOCKET,
 
-    W_MSG_SIZE,
+    CW_MSG_SIZE,
 
-    E_OK,
+    CE_OK,
 
-    E_START_SERVER,
+    CE_INIT_WINSOCK,
 
-    E_INIT_WINSOCK,
+    CE_CREATE_SOCKET,
+    CE_CONNECT,
 
-    E_CREATE_SOCKET,
-    E_CONNECT,
+    CE_AUTH_SEND,
 
-    E_AUTH_CLIENT_SEND,
+    CE_AUTH_RECV,
+    CE_AUTH_RECV_EMPTY,
+    CE_AUTH_RECV_SIZE,
+    CE_AUTH_RECV_GOTERR,
 
-    E_AUTH_SERVER_RECV,
-    E_AUTH_SERVER_EMPTY,
-    E_AUTH_SERVER_SIZE,
-    E_AUTH_SERVER_GOTERR,
+    CE_SERVER_ACK_SIZE,
 
-    E_SERVER_ACK_SIZE,
+    CE_ACKING_PACKET_NOT_FOUND,
 
-    E_ACKING_PACKET_NOT_FOUND,
+    CE_HANDLE_OUT_SEND,
 
-    E_HANDLE_OUT_SEND,
+    CE_SEND,
 
-    E_SEND,
+    CE_RECV,
+    CE_RECV_SIZE,
 
-    E_RECV,
-    E_RECV_SIZE,
+    CE_CONN_CLOSED,
 
-    E_CONN_CLOSED,
+    CE_UNKNOWN_PROTOCOL,
+    CE_UNKNOWN_DATATYPE,
 
-    E_UNKNOWN_PROTOCOL,
-    E_UNKNOWN_DATATYPE,
-
-    E_UNKNOWN
+    CE_UNKNOWN
 };
-static_assert(E_OK == 0);
+static_assert(CE_OK == 0);
 
-enum SERVER_ERR {
-    SE_OK = 0,
+enum ServerError {
+    SW_ALREADY_STARTED = -1,
+
+    SE_OK,
+
+    SE_START_SERVER,
+
+    SE_INIT_WINSOCK,
+
+    SE_CREATE_SOCKET,
 
     SE_UNKNOWN
 };

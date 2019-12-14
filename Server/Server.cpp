@@ -4,10 +4,12 @@
 
 
 // Запуск сервера
-int Server::startServer(uint16_t authPort)
+ServerError Server::startServer(uint16_t authPort)
 {
 	if (started)
-		return -1;
+		return SW_ALREADY_STARTED;
+
+    ServerError err;
 
 	// Init class members
 	this->authSocket = INVALID_SOCKET;
@@ -19,10 +21,10 @@ int Server::startServer(uint16_t authPort)
 
 	WSADATA wsData;
 
-	int err = WSAStartup(MAKEWORD(2, 2), &wsData);
-	if (err) {
+    int init_winsock = WSAStartup(MAKEWORD(2, 2), &wsData);
+	if (init_winsock != NO_ERROR) {
 		wsa_print_err();
-		return 1;
+		return SE_INIT_WINSOCK;
 	}
 
 	if (err = initSockets())
@@ -35,7 +37,7 @@ int Server::startServer(uint16_t authPort)
 	firstHandshakesHandler  = std::thread(&Server::processIncomeConnection, this);
 	secondHandshakesHandler = std::thread(&Server::processIncomeConnection, this);
 
-	return 0;
+	return SE_OK;
 }
 
 // Отключение сервера
@@ -348,7 +350,7 @@ SOCKET Server::initSocket(uint16_t port) // TODO: protocol
 }
 
 // Инициализация сокетов сервера
-int Server::initSockets()
+ServerError Server::initSockets()
 {
 	// Create a read socket that receiving data from server
 	setState(ServerState::CreateAuthSocket);
@@ -356,14 +358,14 @@ int Server::initSockets()
 	authSocket = initSocket(authPort);
 	if (authSocket == INVALID_SOCKET) {
 		wsa_print_err();
-		return 1;
+		return SE_CREATE_SOCKET;
 	}
 
 	LOG::colored(CC_SuccessHL, "The server can authorize clients on the port %d", authPort);
 
 	started = true;
 
-	return 0;
+	return SE_OK;
 }
 
 

@@ -22,7 +22,7 @@ enum class ServerState {
 
 typedef std::map<uint16_t, ConnectedClientPtr> ClientPool;
 
-// Синглтон сервера
+// Server singleton
 class Server {
 public:
 	static Server& getInstance() {
@@ -30,7 +30,7 @@ public:
 		return instance;
 	}
 
-	int  startServer(uint16_t authPort);
+    ServerError startServer(uint16_t authPort);
 	void closeServer();
 
 	// Getters
@@ -62,7 +62,7 @@ public:
 private:
 	SOCKET initSocket(uint16_t port);
 
-	int initSockets();
+    ServerError initSockets();
 
 	void processIncomeConnection();
 

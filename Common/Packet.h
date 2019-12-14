@@ -163,7 +163,7 @@ struct ClientAuthHeader {
 };
 
 struct ServerAuthHeader {
-    SERVER_ERR errorCode;
+    ServerError errorCode;
     uint8_t tokenSize : TOKEN_BITCNT;
 };
 
@@ -176,13 +176,13 @@ static_assert(sizeof(ClientAuthHeader) == 2);
 
 #pragma pack(push, 1)
 struct ClientACK {
-    ERR errorCode;
+    ClientError errorCode;
     uint8_t tokenSize : TOKEN_BITCNT;
     uint32_t acknowledgedID;
 };
 
 struct ServerACK {
-    SERVER_ERR errorCode;
+    ServerError errorCode;
     uint32_t acknowledgedID;
 };
 

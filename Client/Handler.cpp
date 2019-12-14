@@ -5,9 +5,9 @@
 #include <string_view>
 
 // Обработать любой входящий пакет
-ERR Handler::handle_packet(PacketPtr packet)
+ClientError Handler::handle_packet(PacketPtr packet)
 {
-    ERR err = E_OK;
+    ClientError err = CE_OK;
 
     switch (packet->getDataType()) {
     case DT_ACK:
@@ -17,10 +17,10 @@ ERR Handler::handle_packet(PacketPtr packet)
     case DT_AUTH_SERVER:
         LOG::raw_colored(CC_InfoHL, std::string_view(packet->getData(), packet->getDataSize()));
     case DT_EMPTY:
-        err = E_OK;
+        err = CE_OK;
         break;
     default:
-        err = E_UNKNOWN_DATATYPE;
+        err = CE_UNKNOWN_DATATYPE;
     }
 
     if (packet->isNeedACK()) {
@@ -37,13 +37,13 @@ ERR Handler::handle_packet(PacketPtr packet)
 }
 
 // Обработать пакет ACK
-ERR Handler::handle_ack(PacketPtr packet)
+ClientError Handler::handle_ack(PacketPtr packet)
 {
     if (packet->getDataType() != DT_ACK)
-        return E_UNKNOWN;
+        return CE_UNKNOWN;
     else if (packet->getDataSize() < sizeof(ServerACK))
         // Packet size is incorrect
-        return E_SERVER_ACK_SIZE;
+        return CE_SERVER_ACK_SIZE;
     
     auto serverACKHeader = reinterpret_cast<const ServerACK*>(
         packet->getData());
@@ -61,9 +61,9 @@ ERR Handler::handle_ack(PacketPtr packet)
     );
 
     if (acked_packet == end)
-        return E_ACKING_PACKET_NOT_FOUND;
+        return CE_ACKING_PACKET_NOT_FOUND;
 
     Client::getInstance().syncPackets.erase(acked_packet);
 
-    return E_OK;
+    return CE_OK;
 }

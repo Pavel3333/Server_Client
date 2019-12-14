@@ -26,7 +26,7 @@ public:
 		return instance;
 	}
 
-    ERR init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort);
+    ClientError init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort);
 	void disconnect();
 
 	void sendPacket(PacketPtr packet) { mainPackets.push(packet); }
@@ -49,21 +49,21 @@ public:
 	std::queue<PacketPtr>  mainPackets;
 	std::vector<PacketPtr> syncPackets;
 private:
-    ERR initSocket(Socket& sock, uint16_t port, IPPROTO protocol);
-    ERR connect2server(Socket& sock, uint16_t port);
+    ClientError initSocket(Socket& sock, uint16_t port, IPPROTO protocol);
+    ClientError connect2server(Socket& sock, uint16_t port);
 
-    ERR authorize(std::string_view login, std::string_view pass);
+    ClientError authorize(std::string_view login, std::string_view pass);
 
-	ERR handlePacketIn(bool closeAfterTimeout);
-	ERR handlePacketOut(PacketPtr packet);
+	ClientError handlePacketIn(bool closeAfterTimeout);
+	ClientError handlePacketOut(PacketPtr packet);
 
 	void receiverThread();
 	void senderThread();
 
 	void createThreads();
 
-	ERR receiveData(PacketPtr& dest, bool closeAfterTimeout);
-	ERR sendData(PacketPtr packet);
+	ClientError receiveData(PacketPtr& dest, bool closeAfterTimeout);
+	ClientError sendData(PacketPtr packet);
 
 	void setState(ClientState state);
 

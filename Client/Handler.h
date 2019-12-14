@@ -4,7 +4,7 @@
 
 class Handler {
 public:
-    static ERR handle_packet(PacketPtr packet);
+    static ClientError handle_packet(PacketPtr packet);
 private:
-    static ERR handle_ack(PacketPtr packet);
+    static ClientError handle_ack(PacketPtr packet);
 };

@@ -7,7 +7,7 @@ constexpr uint16_t    AUTH_PORT  = 27010;
 constexpr uint16_t    DATA_PORT  = 27011;
 constexpr const char* SERVER_IP  = "192.168.0.12";
 
-ERR start()
+ClientError start()
 {
     std::string login, pass;
 
@@ -72,7 +72,7 @@ ERR start()
 			}
 			else if (cmd == "close") { // Закрытие клиента
 				Client::getInstance().disconnect();
-				return E_OK;
+				return CE_OK;
 			}
 		}
 
@@ -86,12 +86,12 @@ ERR start()
 	if (ctr_reconnect > 5)
 		LOG::raw_colored(CC_DangerHL, "Too many connection attempts. Contact the developers");
 
-	return E_OK;
+	return CE_OK;
 }
 
 int main()
 {
-    ERR err;
+    ClientError err;
 
 	// Задать имя потоку
 	setThreadDesc(L"[main]");

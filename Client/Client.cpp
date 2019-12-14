@@ -2,9 +2,9 @@
 #include <array>
 #include "Client.h"
 
-ERR Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort)
+ClientError Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16_t authPort, uint16_t dataPort)
 {
-    ERR err;
+    ClientError err;
 
 	// Init class members
 	this->authPort = authPort;
@@ -21,7 +21,7 @@ ERR Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
 	int init_winsock = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (init_winsock != NO_ERROR) {
 		wsa_print_err();
-		return E_INIT_WINSOCK;
+		return CE_INIT_WINSOCK;
 	}
 
     // Create an authorization socket
@@ -52,7 +52,7 @@ ERR Client::init(std::string_view login, std::string_view pass, PCSTR IP, uint16
 
     createThreads();
 
-	return E_OK;
+	return CE_OK;
 }
 
 void Client::disconnect()
@@ -99,9 +99,9 @@ void Client::printCommandsList() const
 }
 
 
-ERR Client::initSocket(Socket& sock, uint16_t port, IPPROTO protocol)
+ClientError Client::initSocket(Socket& sock, uint16_t port, IPPROTO protocol)
 {
-    ERR err = sock.init(IP, port, protocol);
+    ClientError err = sock.init(IP, port, protocol);
     if (!SUCCESS(err))
         wsa_print_err();
     if (_ERROR(err))
@@ -124,18 +124,18 @@ ERR Client::initSocket(Socket& sock, uint16_t port, IPPROTO protocol)
             LOG::colored(CC_WarningHL, "Cannot to set receive timeout");
     }
 
-	return E_OK;
+	return CE_OK;
 }
 
-ERR Client::connect2server(Socket& sock, uint16_t port) {
+ClientError Client::connect2server(Socket& sock, uint16_t port) {
     
-    ERR err = sock.connect(IP, port);
+    ClientError err = sock.connect(IP, port);
     if (_ERROR(err)) {
         wsa_print_err();
         return err;
     }
     else if (WARNING(err)) {
-        if (err == W_TIMEOUT)
+        if (err == CW_TIMEOUT)
             LOG::raw_colored(CC_WarningHL, "Unable to connect to the server: timeout");
         else
             LOG::colored(CC_WarningHL, "Unable to connect to the server: warning code %d", err);
@@ -144,7 +144,7 @@ ERR Client::connect2server(Socket& sock, uint16_t port) {
     return err;
 }
 
-ERR Client::authorize(std::string_view login, std::string_view pass)
+ClientError Client::authorize(std::string_view login, std::string_view pass)
 {
     int err;
 
@@ -161,29 +161,29 @@ ERR Client::authorize(std::string_view login, std::string_view pass)
     clientAuth->writeData(pass);
 
     if (sendData(clientAuth))
-        return E_AUTH_CLIENT_SEND;
+        return CE_AUTH_SEND;
 
     PacketPtr serverAuth;
 	err = receiveData(serverAuth, false);
 	if (_ERROR(err))
 		// Критическая ошибка или соединение сброшено
-		return E_AUTH_SERVER_RECV;
+		return CE_AUTH_RECV;
 
 	// Packet handling
 
 	if (!serverAuth)
 		// Empty packet
-		return E_AUTH_SERVER_EMPTY;
+		return CE_AUTH_RECV_EMPTY;
 	else if (serverAuth->getDataSize() < sizeof(ServerAuthHeader))
 		// Packet size is incorrect
-		return E_AUTH_SERVER_SIZE;
+		return CE_AUTH_RECV_SIZE;
 
 	auto serverAuthHeader = reinterpret_cast<const ServerAuthHeader*>(
         serverAuth->getData());
 
     if (_ERROR(serverAuthHeader->errorCode)) {
         LOG::colored(CC_DangerHL, "Auth error: server returned %d", serverAuthHeader->errorCode);
-        return E_AUTH_SERVER_GOTERR;
+        return CE_AUTH_RECV_GOTERR;
     }
     else if (WARNING(serverAuthHeader->errorCode))
         LOG::colored(CC_WarningHL, "Auth warning %d", serverAuthHeader->errorCode);
@@ -192,37 +192,37 @@ ERR Client::authorize(std::string_view login, std::string_view pass)
 
 	LOG::colored(CC_SuccessHL, "Client authorized successfully! Client token: %.*s", token.size(), token.data());
 
-	return E_OK;
+	return CE_OK;
 }
 
 
 // Обработка входящего пакета
-ERR Client::handlePacketIn(bool closeAfterTimeout)
+ClientError Client::handlePacketIn(bool closeAfterTimeout)
 {
 	PacketPtr packet;
 
-	ERR err = receiveData(packet, closeAfterTimeout);
+	ClientError err = receiveData(packet, closeAfterTimeout);
 	if (_ERROR(err))
 		return err; // Произошла ошибка
 
 	if (!packet)
-        return W_HANDLE_IN_PACKET_EMPTY;
+        return CW_HANDLE_IN_PACKET_EMPTY;
 
 	// Обработка пришедшего пакета
     return Handler::handle_packet(packet);
 }
 
 // Обработка исходящего пакета
-ERR Client::handlePacketOut(PacketPtr packet)
+ClientError Client::handlePacketOut(PacketPtr packet)
 {
-    ERR err = sendData(packet);
+    ClientError err = sendData(packet);
 	if (_ERROR(err))
-		return E_HANDLE_OUT_SEND;
+		return CE_HANDLE_OUT_SEND;
 
     if (packet->isNeedACK())
-        return W_NEED_ACK;
+        return CW_NEED_ACK;
 
-	return E_OK;
+	return CE_OK;
 }
 
 
@@ -232,7 +232,7 @@ void Client::receiverThread()
 	// Задать имя потоку
 	setThreadDesc(L"[Receiver]");
 
-	ERR err = E_OK;
+	ClientError err = CE_OK;
 
 	// Ожидание любых входящих пакетов
 	// Таймаут не нужен
@@ -260,7 +260,7 @@ void Client::receiverThread()
 // Поток отправки пакетов
 void Client::senderThread()
 {
-    ERR err;
+    ClientError err;
 
 	// Задать имя потоку
 	setThreadDesc(L"[Sender]");
@@ -310,7 +310,7 @@ void Client::createThreads()
 
 
 // Принятие данных
-ERR Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
+ClientError Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 {
 	setState(ClientState::Receive);
 
@@ -331,54 +331,55 @@ ERR Client::receiveData(PacketPtr& dest, bool closeAfterTimeout)
 			receivedPackets.push_back(dest);
 
             if (dest->getDataSize() != respSize)
-                return E_RECV_SIZE;
+                // Incorrect packet size
+                return CE_RECV_SIZE;
 
             break;
 		}
 		else if (!respSize) {
 			// Соединение сброшено
 			LOG::raw_colored(CC_InfoHL, "Connection closed");
-			return E_CONN_CLOSED;
+			return CE_CONN_CLOSED;
 		}
 		else switch(WSAGetLastError()) {
         case WSAETIMEDOUT:
             // Таймаут
-            if (closeAfterTimeout) return W_TIMEOUT;
+            if (closeAfterTimeout) return CW_TIMEOUT;
             else                   continue;
         case WSAEMSGSIZE:
             // Размер пакета превысил размер буфера
             // Вывести предупреждение
             LOG::raw_colored(CC_WarningHL, "The size of received packet is larger than the buffer size!");
-            return W_MSG_SIZE;
+            return CW_MSG_SIZE;
         case WSAECONNRESET:
         case WSAECONNABORTED:
             // Соединение сброшено
             LOG::raw_colored(CC_InfoHL, "Connection closed");
-            return E_CONN_CLOSED;
+            return CE_CONN_CLOSED;
         default:
             // Критическая ошибка
             wsa_print_err();
-            return E_RECV;
+            return CE_RECV;
 		}
 	}
 
-	return E_OK;
+	return CE_OK;
 }
 
 // Отправка данных
-ERR Client::sendData(PacketPtr packet)
+ClientError Client::sendData(PacketPtr packet)
 {
 	setState(ClientState::Send);
 
 	if (packet->send(dataSocket) == SOCKET_ERROR) {
 		wsa_print_err();
-		return E_SEND;
+		return CE_SEND;
 	}
 
 	// Добавить пакет
 	sendedPackets.push_back(packet);
 
-	return E_OK;
+	return CE_OK;
 }
 
 

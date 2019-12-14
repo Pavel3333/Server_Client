@@ -5,13 +5,13 @@
 constexpr uint16_t AUTH_PORT = 27010;
 constexpr uint16_t DATA_PORT = 27011;
 
-ERR start()
+ServerError start()
 {
     int err;
 
     err = Server::getInstance().startServer(AUTH_PORT);
 	if (_ERROR(err))
-		return ERR::E_START_SERVER;
+		return SE_START_SERVER;
 
 	Server::getInstance().printCommandsList();
 	Cleaner::getInstance().printCommandsList();
@@ -64,12 +64,12 @@ ERR start()
 	if (!Server::getInstance().isRunning())
 		Server::getInstance().closeServer();
 
-	return E_OK;
+	return SE_OK;
 }
 
 int main()
 {
-    ERR err = E_OK;
+    ServerError err = SE_OK;
 
 	// Задать имя потоку
 	setThreadDesc(L"[main]");

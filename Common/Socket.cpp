@@ -1,20 +1,20 @@
 #include "Socket.h"
 
-ERR Socket::setTimeout(uint32_t timeout, int option)
+ClientError Socket::setTimeout(uint32_t timeout, int option)
 {
     if (socket == INVALID_SOCKET)
-        return E_UNKNOWN;
+        return CE_UNKNOWN;
 
     uint32_t value = timeout * 1000;
 
     int err = setsockopt(socket, SOL_SOCKET, option, (char*)&value, sizeof(value));
     if (err == SOCKET_ERROR)
-        return W_SET_TIMEOUT;
+        return CW_SET_TIMEOUT;
 
-    return E_OK;
+    return CE_OK;
 }
 
-ERR Socket::init(PCSTR ip_str, uint16_t port, IPPROTO protocol)
+ClientError Socket::init(PCSTR ip_str, uint16_t port, IPPROTO protocol)
 {
     int sock_type;
 
@@ -27,22 +27,22 @@ ERR Socket::init(PCSTR ip_str, uint16_t port, IPPROTO protocol)
         break;
     default:
         // Unexpected protocol
-        return E_UNKNOWN_PROTOCOL;
+        return CE_UNKNOWN_PROTOCOL;
     }
 
     socket = ::socket(AF_INET, sock_type, protocol);
     if (socket == INVALID_SOCKET)
-        return E_CREATE_SOCKET;
+        return CE_CREATE_SOCKET;
 
     status = 2;
 
-    return E_OK;
+    return CE_OK;
 }
 
-ERR Socket::connect(PCSTR ip_str, uint16_t port)
+ClientError Socket::connect(PCSTR ip_str, uint16_t port)
 {
     if (socket == INVALID_SOCKET)
-        return E_UNKNOWN;
+        return CE_UNKNOWN;
 
     sockaddr_in serverAddr{ AF_INET, htons(port) };
 
@@ -55,40 +55,40 @@ ERR Socket::connect(PCSTR ip_str, uint16_t port)
         switch (WSAGetLastError()) {
         case WSAETIMEDOUT:
             // Таймаут
-            return W_TIMEOUT;
+            return CW_TIMEOUT;
         default:
             // Критическая ошибка
-            return E_CONNECT;
+            return CE_CONNECT;
         }
     }
 
-    return E_OK;
+    return CE_OK;
 }
 
-ERR Socket::shutdown(int how)
+ClientError Socket::shutdown(int how)
 {
     if (socket == INVALID_SOCKET)
-        return E_OK;
+        return CE_OK;
 
     int err = ::shutdown(socket, how);
     if (err == SOCKET_ERROR)
-        return W_SHUTDOWN;
+        return CW_SHUTDOWN;
 
     if (status)
         status--;
 
-    return E_OK;
+    return CE_OK;
 }
 
-ERR Socket::close()
+ClientError Socket::close()
 {
     if (socket == INVALID_SOCKET)
-        return E_OK;
+        return CE_OK;
 
     int err = ::closesocket(socket);
     if (err == SOCKET_ERROR)
-        return W_CLOSE_SOCKET;
+        return CW_CLOSE_SOCKET;
 
     socket = INVALID_SOCKET;
-    return E_OK;
+    return CE_OK;
 }
